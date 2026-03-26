@@ -1,22 +1,28 @@
 :root {
   --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  --bg: #eef3f9;
-  --surface: rgba(255, 255, 255, 0.96);
-  --surface-muted: #f4f7fc;
-  --surface-deep: #dce7f6;
-  --line: #d4deee;
-  --line-strong: #bdd0ea;
-  --navy-950: #10223e;
-  --navy-900: #163054;
-  --navy-800: #23446f;
-  --navy-700: #335b88;
-  --navy-500: #5a7697;
-  --navy-300: #8da3bf;
-  --navy-100: #dfe8f5;
-  --text: #10223e;
-  --text-muted: #5f7290;
-  --shadow: 0 18px 60px rgba(16, 34, 62, 0.08);
+  --color-vanilla: #FFF9EB;
+  --color-sage: #9FB2AC;
+  --color-bloodstone: #5D0D18;
+  --color-brandy: #B29079;
+  --color-chalk: #E1DACA;
+  --color-navy: #1B2A4A;
+  --bg: var(--color-vanilla);
+  --surface: rgba(255, 249, 235, 0.96);
+  --surface-muted: var(--color-chalk);
+  --surface-deep: #d4c8b3;
+  --line: #c6b9a6;
+  --line-strong: var(--color-brandy);
+  --navy-950: #121f38;
+  --navy-900: var(--color-navy);
+  --navy-800: #34486f;
+  --navy-700: #4f6386;
+  --navy-500: #6c7f9f;
+  --navy-300: #98a8c0;
+  --navy-100: #d6deeb;
+  --text: var(--color-navy);
+  --text-muted: #4a5874;
+  --shadow: 0 16px 48px rgba(27, 42, 74, 0.12);
 }
 
 * {
@@ -31,8 +37,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(51, 91, 136, 0.1), transparent 42%),
-    linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+    radial-gradient(circle at top, rgba(178, 144, 121, 0.24), transparent 42%),
+    linear-gradient(180deg, var(--color-vanilla) 0%, var(--bg) 100%);
   color: var(--text);
   font-family:
     var(--font-body),
@@ -954,5 +960,115 @@ button {
 
   .mobile-nav {
     display: none;
+  }
+}
+
+
+.focus-redesign {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(300px, 1fr) minmax(220px, 280px);
+  gap: 18px;
+  color: var(--color-navy);
+}
+
+.focus-redesign__panel {
+  background: var(--color-sage);
+  border-radius: 20px;
+  padding: 16px;
+  border: 1px solid rgba(27, 42, 74, 0.14);
+}
+
+.focus-redesign__panel h2 {
+  margin: 0 0 12px;
+}
+
+.focus-redesign__panel label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.focus-redesign__stats {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--color-chalk);
+}
+
+.focus-redesign__stats p {
+  margin: 0 0 8px;
+}
+
+.focus-redesign__center {
+  background: var(--color-chalk);
+  border-radius: 24px;
+  padding: 22px;
+  border: 1px solid rgba(27, 42, 74, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.focus-redesign__timer-circle {
+  width: min(72vw, 360px);
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  background: radial-gradient(circle at top, var(--color-vanilla) 0%, #f3ead7 70%);
+  border: 12px solid var(--color-bloodstone);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--color-navy);
+}
+
+.focus-redesign__timer-circle strong {
+  font-size: clamp(2.3rem, 8vw, 4rem);
+  letter-spacing: 0.06em;
+}
+
+.focus-redesign__timer-label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.focus-redesign__controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.focus-redesign__controls button {
+  border: 0;
+  background: var(--color-bloodstone);
+  color: var(--color-vanilla);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 700;
+}
+
+.focus-redesign__controls button:disabled {
+  opacity: 0.45;
+}
+
+.focus-redesign__leaderboard {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.focus-redesign__leaderboard li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 960px) {
+  .focus-redesign {
+    grid-template-columns: 1fr;
   }
 }
