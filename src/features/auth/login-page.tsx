@@ -1,62 +1,85 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button, getButtonClassName } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { NoticeBanner } from "@/components/ui/state-panels";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getReadableErrorMessage } from "@/lib/ui-error";
-import { getStudyFocusApi } from "@/services/study-focus-api";
 
-const studyFocusApi = getStudyFocusApi();
 
-function resolveAuthErrorMessage(authStatus: string | null) {
-  if (authStatus === "missing-code") {
-    return "登入連結缺少必要驗證資訊，請重新寄送一次登入信。";
+function resolveAuthError(errorMessage: string) {
+  if (errorMessage.includes("Invalid login credentials")) {
+    return "帳號或密碼錯誤，請重新確認。";
   }
 
-  if (authStatus === "error") {
-    return "登入驗證沒有完成，請重新寄送登入信後再試一次。";
+  if (errorMessage.includes("Email not confirmed")) {
+    return "帳號尚未啟用，請聯絡管理員。";
   }
 
-  return null;
+  return "登入失敗，請稍後再試。";
 }
 
 export function LoginPage() {
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/";
-  const authErrorMessage = useMemo(
-    () => resolveAuthErrorMessage(searchParams.get("auth")),
-    [searchParams],
-  );
+  const nextPath = searchParams.get("next") ?? "/focus";
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "sent">("email");
+  const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<{
     text: string;
     tone: "error" | "success";
-  } | null>(authErrorMessage ? { text: authErrorMessage, tone: "error" } : null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<"login" | "register" | null>(null);
 
-  async function handleRequestLink(event: FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
     setNotice(null);
+    setIsSubmitting("login");
 
     try {
-      const result = await studyFocusApi.requestEmailOtp(email, nextPath);
-      setStep("sent");
-      setNotice({
-        text: `登入連結已寄到 ${result.maskedEmail}。${result.deliveryHint}`,
-        tone: "success",
-      });
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        throw error;
+      }
+
+      const redirectPath = nextPath.startsWith("/") ? nextPath : "/focus";
+      window.location.assign(redirectPath);
     } catch (reason) {
+      const fallback = getReadableErrorMessage(reason, "登入失敗，請稍後再試。");
       setNotice({
-        text: getReadableErrorMessage(reason, "登入信寄送失敗，請稍後再試一次。"),
+        text: resolveAuthError(fallback),
         tone: "error",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(null);
+    }
+  }
+
+  async function handleRegister() {
+    setNotice(null);
+    setIsSubmitting("register");
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.signUp({ email, password });
+
+      if (error) {
+        throw error;
+      }
+
+      setNotice({ text: "註冊成功，正在前往專注頁面。", tone: "success" });
+      window.location.assign("/focus");
+    } catch (reason) {
+      const fallback = getReadableErrorMessage(reason, "註冊失敗，請稍後再試。");
+      setNotice({
+        text: resolveAuthError(fallback).replace("登入", "註冊"),
+        tone: "error",
+      });
+    } finally {
+      setIsSubmitting(null);
     }
   }
 
@@ -65,62 +88,59 @@ export function LoginPage() {
       <div className="auth-panel">
         <PageHeader
           eyebrow="登入"
-          title="用 Email 登入讀書班"
-          description="目前 MVP 會寄送 Email 登入連結。打開信件後，系統會把你帶回這個讀書專注 App。"
+          title="使用 Email 與密碼登入"
+          description="輸入帳號密碼後即可開始專注計時。"
         />
 
-        {notice ? (
-          <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner>
-        ) : null}
+        {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
-        {step === "email" ? (
-          <form className="field-grid" onSubmit={handleRequestLink}>
-            <div className="stack-xs">
-              <label className="field-label" htmlFor="login-email">
-                學校 Email 或常用信箱
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                className="input"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="student@example.com"
-                required
-              />
-              <p className="field-help">
-                不需要密碼，收到登入信後直接點開即可。
-              </p>
-            </div>
-
-            <Button type="submit" disabled={isSubmitting} fullWidth>
-              {isSubmitting ? "寄送中..." : "寄送登入連結"}
-            </Button>
-          </form>
-        ) : null}
-
-        {step === "sent" ? (
-          <div className="state-card state-card--stack">
-            <div className="stack-xs">
-              <h3 className="state-title">請到信箱完成登入</h3>
-              <p className="state-description">
-                找到 Study Focus 的登入信後直接點開，系統就會回到 App。
-              </p>
-            </div>
-            <div className="button-row">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep("email")}
-              >
-                重新輸入 Email
-              </Button>
-              <Link href="/" className={getButtonClassName("ghost")}>
-                先回首頁
-              </Link>
-            </div>
+        <form className="field-grid" onSubmit={handleLogin}>
+          <div className="stack-xs">
+            <label className="field-label" htmlFor="login-email">
+              Email
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              className="input"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="demo@studyfocus.tw"
+              required
+            />
           </div>
-        ) : null}
+
+          <div className="stack-xs">
+            <label className="field-label" htmlFor="login-password">
+              密碼
+            </label>
+            <input
+              id="login-password"
+              type="password"
+              className="input"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="請輸入密碼"
+              minLength={6}
+              required
+            />
+          </div>
+
+          <div className="button-row">
+            <Button type="submit" disabled={isSubmitting !== null} fullWidth>
+              {isSubmitting === "login" ? "登入中..." : "登入"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isSubmitting !== null}
+              fullWidth
+              onClick={() => void handleRegister()}
+            >
+              {isSubmitting === "register" ? "註冊中..." : "註冊"}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
