@@ -1,0 +1,15 @@
+.claude/
+node_modules
+.next
+.next-*/
+.env
+.env.local
+.env.*.local
+dist
+coverage
+*.tsbuildinfo
+*.err.log
+*.out.log
+qa-chrome-profile/
+root.html
+root-dom.html
