@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import {
   AuthRequiredState,
   EmptyState,
@@ -17,6 +19,7 @@ import { getStudyFocusApi } from "@/services/study-focus-api";
 import { getStudyFocusV1Api } from "@/services/study-focus-v1-api";
 
 const SESSION_SECONDS = 50 * 60;
+const STOP_DRAG_THRESHOLD_PX = 80;
 const studyFocusApi = getStudyFocusApi();
 const studyFocusV1Api = getStudyFocusV1Api();
 
@@ -31,6 +34,18 @@ interface FocusPageData {
     currentMinutes: number;
     targetMinutes: number;
   };
+}
+
+function formatHHMMSS(totalSeconds: number) {
+  const safeSeconds = Math.max(totalSeconds, 0);
+  const hours = Math.floor(safeSeconds / 3600)
+    .toString()
+    .padStart(2, "0");
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (safeSeconds % 60).toString().padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function formatMMSS(totalSeconds: number) {
@@ -64,6 +79,7 @@ async function loadFocusPageData(): Promise<FocusPageData> {
 }
 
 export function FocusPage() {
+  const router = useRouter();
   const { data, errorMessage, errorStatus, isError, isLoading, reload, setData } =
     useAsyncData(loadFocusPageData, []);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
@@ -77,6 +93,12 @@ export function FocusPage() {
     tone: "error" | "success";
     text: string;
   } | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDraggingStop, setIsDraggingStop] = useState(false);
+  const dragStartYRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!data) {
@@ -112,11 +134,10 @@ export function FocusPage() {
   const secondsRemaining = activeSession
     ? Math.max(SESSION_SECONDS - elapsedSeconds, 0)
     : SESSION_SECONDS;
-
-  const leaderboardGroups = useMemo(
-    () => [...(data?.groups ?? [])].sort((a, b) => b.liveStudyingCount - a.liveStudyingCount).slice(0, 5),
-    [data?.groups],
-  );
+  const dailyTotalBaseSeconds = (data?.todayTotalMinutes ?? 0) * 60;
+  const runningSessionSeconds = activeSession?.status === "active" ? elapsedSeconds : 0;
+  const dailyTotalDisplaySeconds = dailyTotalBaseSeconds + runningSessionSeconds;
+  const barProgress = Math.min(elapsedSeconds / SESSION_SECONDS, 1);
 
   async function handleStartOrResume() {
     setNotice(null);
@@ -150,22 +171,6 @@ export function FocusPage() {
     }
   }
 
-  async function handlePause() {
-    if (!activeSession) return;
-
-    setNotice(null);
-    setPendingAction("pause");
-    try {
-      const paused = await studyFocusV1Api.pauseStudySession(activeSession.id);
-      setActiveSession(paused);
-      setNotice({ tone: "success", text: "已暫停，可稍後繼續。" });
-    } catch (reason) {
-      setNotice({ tone: "error", text: getReadableErrorMessage(reason, "暫停失敗。") });
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   async function handleStop() {
     if (!activeSession) return;
 
@@ -181,10 +186,15 @@ export function FocusPage() {
               ...current,
               openSession: null,
               todaySessionCount: current.todaySessionCount + 1,
-              todayTotalMinutes: current.todayTotalMinutes + completedMinutes,
+              todayTotalMinutes: Math.max(
+                current.todayTotalMinutes + completedMinutes,
+                Math.round((dailyTotalDisplaySeconds - runningSessionSeconds + stopped.effectiveDurationSeconds) / 60),
+              ),
             }
           : current,
       );
+      setDragOffset(0);
+      setIsDraggingStop(false);
       setNotice({ tone: "success", text: "本輪已結束並完成紀錄。" });
     } catch (reason) {
       setNotice({ tone: "error", text: getReadableErrorMessage(reason, "停止失敗。") });
@@ -221,12 +231,108 @@ export function FocusPage() {
     );
   }
 
+  const navItems: Array<{ label: string; href: Route }> = [
+    { label: "concent", href: "/focus" },
+    { label: "group", href: "/groups" },
+    { label: "plan", href: "/exams" },
+    { label: "group", href: "/groups" },
+    { label: "record", href: "/leaderboard" },
+    { label: "mine", href: "/profile" },
+  ];
+
+  const canShowRunningLayout = activeSession?.status === "active";
+
+  function handleStopDragStart(clientY: number) {
+    if (!canShowRunningLayout || pendingAction !== null) {
+      return;
+    }
+    dragStartYRef.current = clientY;
+    setIsDraggingStop(true);
+  }
+
+  function handleStopDragMove(clientY: number) {
+    if (!isDraggingStop || dragStartYRef.current === null) {
+      return;
+    }
+    const offset = Math.max(clientY - dragStartYRef.current, 0);
+    setDragOffset(offset);
+  }
+
+  function handleStopDragEnd() {
+    if (!isDraggingStop) {
+      return;
+    }
+    const reachedThreshold = dragOffset >= STOP_DRAG_THRESHOLD_PX;
+    setIsDraggingStop(false);
+    setDragOffset(0);
+    dragStartYRef.current = null;
+
+    if (reachedThreshold) {
+      void handleStop();
+    }
+  }
+
   return (
-    <div className="page">
-      <section className="focus-redesign">
-        <aside className="focus-redesign__panel focus-redesign__panel--left">
-          <h2>讀書設定</h2>
-          <label htmlFor="focus-subject">科目</label>
+    <div className="page focus-mobile">
+      <aside className={`focus-mobile__sidebar ${isSidebarOpen ? "is-open" : ""}`}>
+        <button
+          type="button"
+          className="focus-mobile__close-sidebar"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="Close sidebar"
+        >
+          ×
+        </button>
+        <nav className="focus-mobile__nav">
+          {navItems.map((item, index) => (
+            <div key={`${item.label}-${index}`} className="focus-mobile__nav-wrap">
+              <button
+                type="button"
+                className={`focus-mobile__nav-item ${index === 0 ? "is-primary" : ""}`}
+                onClick={() => {
+                  setIsSidebarOpen(false);
+                  router.push(item.href);
+                }}
+              >
+                {item.label}
+              </button>
+              {index < navItems.length - 1 ? <span className="focus-mobile__nav-square" /> : null}
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      {isSidebarOpen ? (
+        <button
+          type="button"
+          className="focus-mobile__sidebar-backdrop"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="close sidebar overlay"
+        />
+      ) : null}
+
+      <section className="focus-mobile__canvas">
+        {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
+        <button
+          type="button"
+          className="focus-mobile__sidebar-trigger"
+          onClick={() => setIsSidebarOpen(true)}
+          aria-label="open sidebar"
+        >
+          ☰
+        </button>
+        <div className="focus-mobile__crossline" />
+
+        <header className="focus-mobile__header">
+          <p>Learning time</p>
+          <strong>{formatHHMMSS(dailyTotalDisplaySeconds)}</strong>
+          <em>Be confident</em>
+        </header>
+
+        <div className="focus-mobile__controls">
+          <label htmlFor="focus-subject" className="sr-only">
+            科目
+          </label>
           <select
             id="focus-subject"
             className="select"
@@ -240,8 +346,9 @@ export function FocusPage() {
               </option>
             ))}
           </select>
-
-          <label htmlFor="focus-group">小組</label>
+          <label htmlFor="focus-group" className="sr-only">
+            小組
+          </label>
           <select
             id="focus-group"
             className="select"
@@ -255,64 +362,101 @@ export function FocusPage() {
               </option>
             ))}
           </select>
+        </div>
 
-          <div className="focus-redesign__stats">
-            <p>今日專注：{data.todayTotalMinutes} 分鐘</p>
-            <p>完成場次：{data.todaySessionCount} 場</p>
-            <p>目標進度：{data.dailyGoal.currentMinutes}/{data.dailyGoal.targetMinutes} 分鐘</p>
-            <p>目前在線：{data.currentlyStudyingCount} 人</p>
-          </div>
-        </aside>
-
-        <main className="focus-redesign__center">
-          {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
-          <div className="focus-redesign__timer-circle">
-            <p className="focus-redesign__timer-label">
-              {activeSession?.status === "active" ? "專注中" : activeSession ? "已暫停" : "準備開始"}
-            </p>
-            <strong>{formatMMSS(secondsRemaining)}</strong>
-          </div>
-          <div className="focus-redesign__controls">
+        {!canShowRunningLayout ? (
+          <div className="focus-mobile__idle">
+            <p className="focus-mobile__start-label">start</p>
             <button
               type="button"
+              className="focus-mobile__start-bar"
               onClick={() => void handleStartOrResume()}
-              disabled={pendingAction !== null || activeSession?.status === "active"}
+              disabled={pendingAction !== null}
+              aria-label="start study session"
+            />
+            {activeSession?.status === "paused" ? (
+              <button
+                type="button"
+                className="focus-mobile__resume-button"
+                onClick={() => void handleStartOrResume()}
+                disabled={pendingAction !== null}
+              >
+                繼續暫停中的專注
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="focus-mobile__running">
+            <div className="focus-mobile__learning-label">Learning</div>
+            <div
+              className="focus-mobile__rising-track"
+              onPointerUp={handleStopDragEnd}
+              onPointerCancel={handleStopDragEnd}
+              onPointerMove={(event) => handleStopDragMove(event.clientY)}
             >
-              {activeSession?.status === "paused" ? "繼續" : "開始"}
-            </button>
+              <div
+                className="focus-mobile__rising-fill"
+                style={{ height: `${Math.max(barProgress * 100, 6)}%` }}
+              />
+              <button
+                type="button"
+                className="focus-mobile__drag-stop-handle"
+                onPointerDown={(event) => {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  handleStopDragStart(event.clientY);
+                }}
+                onPointerMove={(event) => handleStopDragMove(event.clientY)}
+                onPointerUp={(event) => {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  handleStopDragEnd();
+                }}
+                onPointerCancel={handleStopDragEnd}
+                style={{ transform: `translateY(${dragOffset}px)` }}
+                aria-label="drag down to stop"
+              >
+                ⬇
+              </button>
+            </div>
+            <div className="focus-mobile__running-footer">
+              <span>stop</span>
+              <span>{formatMMSS(elapsedSeconds)}</span>
+            </div>
             <button
               type="button"
-              onClick={() => void handlePause()}
-              disabled={pendingAction !== null || activeSession?.status !== "active"}
-            >
-              暫停
-            </button>
-            <button
-              type="button"
+              className="focus-mobile__stop-fallback"
               onClick={() => void handleStop()}
-              disabled={pendingAction !== null || !activeSession}
+              disabled={pendingAction !== null}
             >
-              停止
+              停止（備用）
             </button>
           </div>
-        </main>
+        )}
 
-        <aside className="focus-redesign__panel focus-redesign__panel--right">
-          <h2>排行榜快照</h2>
-          {leaderboardGroups.length === 0 ? (
-            <p>目前沒有小組資料。</p>
-          ) : (
-            <ol className="focus-redesign__leaderboard">
-              {leaderboardGroups.map((group, index) => (
-                <li key={group.id}>
-                  <span>#{index + 1} {group.name}</span>
-                  <span>{group.liveStudyingCount} 人專注中</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </aside>
+        <div className="focus-mobile__meta">
+          <p>今日場次 {data.todaySessionCount}</p>
+          <p>目標 {data.dailyGoal.currentMinutes}/{data.dailyGoal.targetMinutes} 分鐘</p>
+          <p>在線 {data.currentlyStudyingCount}</p>
+          <p>剩餘 {formatMMSS(secondsRemaining)}</p>
+        </div>
       </section>
+
+      <button
+        type="button"
+        className={`focus-mobile__note-tab ${isNoteOpen ? "is-open" : ""}`}
+        onClick={() => setIsNoteOpen((current) => !current)}
+      >
+        Note
+      </button>
+
+      <aside className={`focus-mobile__note-panel ${isNoteOpen ? "is-open" : ""}`}>
+        <label htmlFor="focus-note-textarea">筆記</label>
+        <textarea
+          id="focus-note-textarea"
+          value={notesDraft}
+          onChange={(event) => setNotesDraft(event.target.value)}
+          placeholder="記錄現在的想法..."
+        />
+      </aside>
     </div>
   );
 }
