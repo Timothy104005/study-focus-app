@@ -1,79 +1,83 @@
 # MVP Checklist
 
-Updated: 2026-03-26
+Updated: 2026-03-27  
+Branch: `fix/mvp-stabilization`
 
 Status legend:
 
-- `[x]` verified in the latest local smoke pass
-- `[~]` partially verified or UI-only
-- `[ ]` blocked or still failing
+- `[x]` code path stabilized in this branch
+- `[~]` partially stabilized or still needs runtime verification
+- `[ ]` still blocked
 
 ## QA Baseline
 
-- `[x]` `npm run typecheck` passes.
-- `[x]` `NEXT_DIST_DIR=.next-qa-build npm run build` passes.
-- `[x]` Local smoke run completed against `http://localhost:3011`.
+- `[~]` Branch-level code inspection completed.
+- `[ ]` Full browser smoke pass executed on this branch.
+- `[ ]` Real Supabase-backed end-to-end pass executed on this branch.
 
 ## Login
 
-- `[x]` `/login` renders the email form.
-- `[x]` Submitting an email reaches the "check your inbox" success state.
-- `[~]` Login request flow is smoke-tested in mock mode.
-- `[ ]` Real magic-link callback is verified end to end.
+- `[x]` `/login` renders the email/password form.
+- `[x]` Mock mode can bypass real Supabase auth for MVP smoke runs.
+- `[~]` Real email/password login still needs env-backed verification.
+- `[~]` Real registration still needs env-backed verification.
 
 ## Focus Timer
 
-- `[ ]` `/focus` loads the timer controls.
-- `[ ]` Start, pause, resume, and stop are verified.
-- `[ ]` Tab blur / visibility interruption tracking is verified.
-- `[ ]` Focus timer is demo-safe in local mock mode.
-
-Current blocker:
-
-- `[ ]` `GET /api/v1/study-sessions?openOnly=true` returns `500`.
-- `[ ]` Server log points to missing Supabase env values while the page still depends on the v1 study-session API.
+- `[x]` `/focus` has a mock-capable v1 session service.
+- `[x]` Start flow exists in both page logic and mock v1 service.
+- `[x]` Pause flow now exists in the page.
+- `[x]` Resume flow exists.
+- `[x]` Stop flow exists.
+- `[x]` Basic interruption reporting is now wired in the page.
+- `[~]` Full browser verification of start/pause/resume/stop is still pending.
+- `[~]` Real Supabase-backed v1 session verification is still pending.
 
 ## Daily / Weekly Leaderboard
 
-- `[x]` Daily leaderboard renders.
-- `[x]` Weekly leaderboard toggle renders and updates the ranking list.
-- `[x]` Group selector renders current seeded groups.
+- `[x]` Daily leaderboard route and toggle logic remain intact.
+- `[x]` Weekly leaderboard route and toggle logic remain intact.
+- `[~]` Browser smoke verification on this branch is still pending.
 
 ## Groups / Class Membership
 
-- `[x]` Joined an existing group with invite code `MOCK11`.
-- `[x]` Created a new group (`QA 3011 Group`) from the UI.
-- `[x]` Group detail page opens for the new group.
-- `[x]` Join-code example text now matches current seeded data (`DAAN3A`).
+- `[x]` Group list flow remains intact.
+- `[x]` Create group flow remains intact.
+- `[x]` Join group flow remains intact.
+- `[x]` Group detail route remains intact.
+- `[~]` Browser smoke verification on this branch is still pending.
 
 ## Exam Countdown CRUD
 
-- `[x]` Exam countdown list renders.
-- `[x]` Custom exam create works in local mock mode.
-- `[x]` Custom exam edit works in local mock mode.
-- `[x]` Custom exam delete works in local mock mode.
+- `[x]` Exam countdown list flow remains intact.
+- `[x]` Custom exam create remains intact.
+- `[x]` Custom exam edit remains intact.
+- `[x]` Custom exam delete remains intact.
 - `[x]` Shared / group exams remain read-only.
+- `[~]` Browser smoke verification on this branch is still pending.
 
 ## Discussion Board
 
-- `[x]` Group discussion composer renders.
-- `[x]` Posting from group detail succeeds.
-- `[x]` The new post appears immediately in the discussion list.
+- `[x]` Group discussion composer remains intact.
+- `[x]` Group discussion posting remains intact.
+- `[x]` Report / hide / remove actions remain wired.
+- `[~]` Browser smoke verification on this branch is still pending.
 
 ## Profile Stats
 
-- `[x]` Profile summary renders.
-- `[x]` 7-day trend renders.
-- `[x]` Recent sessions list renders.
+- `[x]` Profile summary route remains intact.
+- `[x]` Trend chart and recent sessions remain intact.
+- `[~]` Browser smoke verification on this branch is still pending.
 
-## Console / Build Notes
+## i18n / Copy Consistency
 
-- `[x]` No new build errors after the latest fixes.
-- `[x]` No blocking console errors were observed on login, leaderboard, groups, exams, discussion, or profile.
-- `[~]` A missing `/favicon.ico` can still appear as low-priority console noise on a fresh page load.
+- `[x]` Rescue-branch navigation copy is back to consistent zh-TW labels.
+- `[~]` Full zh-TW / en switching is not verified from the currently inspected routes.
+- `[ ]` Dedicated i18n switch pass has not been completed.
 
 ## Current Acceptance View
 
-- `[x]` Leaderboard, groups, exams, discussion, and profile are smoke-passable locally.
-- `[~]` Login is acceptable only as a UI/request-flow smoke pass.
-- `[ ]` Focus timer remains the main MVP blocker for a truthful end-to-end acceptance signoff.
+- `[x]` The rescue branch now targets MVP stabilization, not redesign.
+- `[x]` Focus is no longer structurally blocked in mock mode.
+- `[~]` Real backend verification is still required before final acceptance.
+- `[~]` Language-switch acceptance is still not ready to claim.

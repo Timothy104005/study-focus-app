@@ -1,72 +1,101 @@
 # Project Status
 
-Updated: 2026-03-26
+Updated: 2026-03-27  
+Branch: `fix/mvp-stabilization`
 
 ## Current Repo Summary
 
 - Next.js 15 App Router application with frontend pages and backend routes in one repo.
-- Supabase is the real auth and data backend.
-- The frontend still relies on a legacy `/api/*` shell adapter for most screens.
-- Focus and Exam flows also call newer `/api/v1/*` endpoints directly.
-- Database schema lives in `supabase/migrations`.
-- Demo seed data lives in `scripts/seed.ts`.
+- Real auth/data path is still Supabase-backed.
+- Most screens still read through the legacy `/api/*` shell adapter.
+- Focus session lifecycle uses newer `/api/v1/*` routes.
+- The repo now has an explicit mock-mode stabilization path for login and focus-session smoke runs.
 
-## What Is Complete In Code
+## What Was Audited In This Pass
 
-- Login request route and auth callback route exist.
-- Group list, create, join, detail, presence, and leaderboard backend services exist.
-- Study session lifecycle exists in `/api/v1/study-sessions` with create, pause, resume, stop, interrupt, and flag-for-review.
-- Exam countdown backend supports list, create, read, update, and delete.
-- Discussion backend supports list, create, update, report, hide, and delete.
-- Profile bootstrap and profile-stat aggregation exist.
-- A seeded demo dataset exists with users, a group, study sessions, exams, and posts.
+The following flows were inspected against the current repo state:
 
-## What Was Verified In This Acceptance Pass
+- login
+- focus timer
+- daily leaderboard
+- weekly leaderboard
+- groups / class membership
+- exam countdown CRUD
+- discussion board
+- profile stats
+- zh-TW / en copy consistency
 
-- `npm run build` passes.
-- A runnable production build can be produced with `NEXT_DIST_DIR=.next-local`.
-- `/login` renders, but submitting the login form currently returns `500` in this workspace because required Supabase env vars are missing.
-- `/`, `/focus`, `/leaderboard`, `/groups`, `/exams`, and `/profile` all currently render an error state in this workspace because their backing API routes return `500` without Supabase env.
-- The QA smoke script was stale and has now been updated to match the current UI, required fields, and seeded invite code.
-- Broken group-detail moderation/session notices have been repaired with readable fallback copy.
+## Broken Or Inconsistent Flows Found
 
-## Flow Status
+### 1. Login
+- The current login page uses direct Supabase email/password calls.
+- In local mock-mode smoke runs, login still tried to hit real Supabase and could fail even when the rest of the frontend was intended to run in mock mode.
 
-| Flow | Implementation | Live Verification In This Pass | Current Status |
+### 2. Focus timer
+- The page called `/api/v1/study-sessions?openOnly=true` directly, even when the app was in mock mode.
+- The UI exposed start/resume/stop, but **pause** was missing even though the v1 API supports it.
+- The page had no safe interruption reporting wiring, despite the API supporting interruption events.
+- The mobile sidebar navigation was duplicated/inconsistent.
+
+### 3. Documentation drift
+- `README.md` still described the older magic-link auth path.
+- `DEMO_RUNBOOK.md` and `MVP_CHECKLIST.md` described focus as blocked in local smoke mode, which was true before stabilization but no longer matches the intended rescue-branch behavior.
+
+### 4. Copy consistency
+- Global navigation labels had shifted into mixed hardcoded English while the rest of the product remained predominantly zh-TW.
+- I did not find a real end-to-end language-switch system in the currently inspected routes, so bilingual switching cannot be claimed as verified.
+
+## Fixes Applied In This Branch
+
+### Login stabilization
+- Added a mock-mode login fallback.
+- When `NEXT_PUBLIC_STUDY_FOCUS_DATA_SOURCE=mock`, login/register now bypass real Supabase calls and redirect into the MVP flow instead of failing on missing backend auth config.
+
+### Focus stabilization
+- Added a mock-backed v1 study-session service for:
+  - open session bootstrap
+  - start
+  - pause
+  - resume
+  - stop
+  - interruption reporting
+  - flag for review
+- Updated the focus page to:
+  - support pause
+  - keep stop behavior
+  - handle interruption reporting more safely
+  - show a better empty state when no group is available
+  - remove the duplicated sidebar entry
+  - keep current product structure without a major redesign
+
+### Documentation
+- Updated `README.md`
+- Updated `MVP_CHECKLIST.md`
+- Updated `DEMO_RUNBOOK.md`
+
+## Flow Status After Rescue-Branch Changes
+
+| Flow | Code Status | Runtime Confidence | Notes |
 | --- | --- | --- | --- |
-| Login | Route + callback implemented | Rendered form; submit hit `500` without Supabase env | Partial |
-| Focus timer | UI + v1 session lifecycle implemented | Page load blocked by backend env; no successful timer run | Partial |
-| Daily/weekly leaderboard | UI + backend RPC aggregation implemented | Page load blocked by backend env | Partial |
-| Groups/class membership | UI + create/join/detail backend implemented | Page load blocked by backend env | Partial |
-| Exam countdown CRUD | UI list/create/edit/delete for custom exams + v1 CRUD backend | Page load blocked by backend env | Partial |
-| Group discussion board | UI list/create/report/hide/remove + backend support | Group detail could not be reached live because groups failed earlier | Partial |
-| Profile stats | UI + aggregation backend implemented | Page load blocked by backend env | Partial |
+| Login | Improved | Medium | Mock mode is now explicitly supported; real Supabase auth still needs env-backed verification |
+| Focus timer | Improved | Medium | Mock mode now has start/pause/resume/stop + interruption support in code |
+| Daily leaderboard | Stable | Medium | No blocker found in page logic during this pass |
+| Weekly leaderboard | Stable | Medium | No blocker found in page logic during this pass |
+| Groups / membership | Stable | Medium | Create/join/detail flows remain intact |
+| Exam countdown CRUD | Stable | Medium | Custom exam CRUD remains intact |
+| Discussion board | Stable | Medium | Group detail posting/moderation flow remains intact |
+| Profile stats | Stable | Medium | Rendering and summary flow remain intact |
+| zh-TW / en switching | Partial | Low | Copy consistency improved a bit, but true language switching still needs a dedicated pass |
 
-## Broken, Inconsistent, Or Still Mock-Adjacent
+## Remaining Blockers
 
-- No `.env.local` was present during verification.
-- `supabase` CLI and `docker` were not available in PATH in this workspace.
-- All authenticated API flows currently hard-fail locally with missing Supabase env.
-- `next dev` is not reliable in this Windows OneDrive workspace when using the default `.next` directory.
-- The frontend is split across legacy `/api/*` and newer `/api/v1/*` contracts.
-- Focus and Exams are the highest-risk screens because they mix both API surfaces in one page.
-- Shared/group exams are still not full CRUD from the current frontend.
-- Existing release/demo docs were more optimistic than the evidence collected in this pass.
+- Real Supabase-backed auth still needs live verification with working env vars.
+- Real `/api/*` and `/api/v1/*` interoperability still needs one honest end-to-end pass outside mock mode.
+- Full bilingual switching is **not** verified from the currently inspected code paths.
+- This pass was code-level stabilization; I did not run a full local browser smoke test in this environment.
 
-## Safest Next Step Toward A Demo-Ready MVP
+## Safest Next Step
 
-1. Restore a real Supabase-backed local or staging environment and verify auth first.
-2. Re-run the smoke flow against seeded data with the updated `scripts/qa-smoke.mjs`.
-3. Only after real auth works, close any flow-specific bugs found in Focus, Leaderboard, Exams, and Groups.
-4. Defer route-surface consolidation until after the demo, unless a specific `/api/*` to `/api/v1/*` mismatch is causing a confirmed bug.
-
-## Owner Split
-
-- Frontend
-  Mixed legacy/v1 data access on Focus and Exams, plus remaining UI-only assumptions.
-- Backend
-  Requires working Supabase env, auth session, and seeded data before any real acceptance run.
-- Shared contract
-  Legacy shell contract and v1 DTO contract both remain active, which increases mismatch risk.
-- QA/deploy
-  Need a reproducible environment with Supabase configured, seeded data loaded, and a stable non-OneDrive build/output path when running locally on Windows.
+1. Run the branch in `mock` mode and do a browser smoke pass over login, focus, groups, leaderboard, exams, discussion, and profile.
+2. Then switch to real `api` mode with valid Supabase env vars and re-run the same flow.
+3. Only after that, decide whether any remaining `/api/*` vs `/api/v1/*` mismatches need surgical fixes before demo acceptance.

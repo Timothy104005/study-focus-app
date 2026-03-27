@@ -20,6 +20,7 @@ import { getStudyFocusV1Api } from "@/services/study-focus-v1-api";
 
 const SESSION_SECONDS = 50 * 60;
 const STOP_DRAG_THRESHOLD_PX = 80;
+const INTERRUPTION_COOLDOWN_MS = 15_000;
 const studyFocusApi = getStudyFocusApi();
 const studyFocusV1Api = getStudyFocusV1Api();
 
@@ -34,6 +35,7 @@ interface FocusPageData {
     currentMinutes: number;
     targetMinutes: number;
   };
+  sessionLoadWarning: string | null;
 }
 
 function formatHHMMSS(totalSeconds: number) {
@@ -58,15 +60,27 @@ function formatMMSS(totalSeconds: number) {
 }
 
 async function loadFocusPageData(): Promise<FocusPageData> {
-  const [overview, groups, openSessions] = await Promise.all([
+  const [overview, groups] = await Promise.all([
     studyFocusApi.getFocusOverview(),
     studyFocusApi.getGroups(),
-    studyFocusV1Api.listOpenStudySessions(),
   ]);
+
+  let openSession: StudySessionDto | null = null;
+  let sessionLoadWarning: string | null = null;
+
+  try {
+    const openSessions = await studyFocusV1Api.listOpenStudySessions();
+    openSession = openSessions[0] ?? null;
+  } catch (reason) {
+    sessionLoadWarning = getReadableErrorMessage(
+      reason,
+      "目前無法同步未完成的專注狀態，先以新 session 模式顯示。",
+    );
+  }
 
   return {
     groups,
-    openSession: openSessions[0] ?? null,
+    openSession,
     subjects: localizeSubjectTags(overview.subjects),
     currentlyStudyingCount: overview.currentlyStudyingCount,
     todaySessionCount: overview.todaySessionCount,
@@ -75,6 +89,7 @@ async function loadFocusPageData(): Promise<FocusPageData> {
       currentMinutes: overview.dailyGoal.currentMinutes,
       targetMinutes: overview.dailyGoal.targetMinutes,
     },
+    sessionLoadWarning,
   };
 }
 
@@ -86,11 +101,11 @@ export function FocusPage() {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [activeSession, setActiveSession] = useState<StudySessionDto | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [pendingAction, setPendingAction] = useState<"start" | "pause" | "stop" | null>(
-    null,
-  );
+  const [pendingAction, setPendingAction] = useState<
+    "start" | "pause" | "stop" | null
+  >(null);
   const [notice, setNotice] = useState<{
-    tone: "error" | "success";
+    tone: "error" | "success" | "warning" | "info";
     text: string;
   } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -99,6 +114,15 @@ export function FocusPage() {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDraggingStop, setIsDraggingStop] = useState(false);
   const dragStartYRef = useRef<number | null>(null);
+  const interruptionLockRef = useRef(false);
+  const lastInterruptionAtRef = useRef(0);
+
+  function syncOpenSession(nextSession: StudySessionDto | null) {
+    setActiveSession(nextSession);
+    setData((current) =>
+      current ? { ...current, openSession: nextSession } : current,
+    );
+  }
 
   useEffect(() => {
     if (!data) {
@@ -109,6 +133,16 @@ export function FocusPage() {
     setSelectedSubjectId((current) => current || data.subjects[0]?.id || "");
     setActiveSession(data.openSession);
   }, [data]);
+
+  useEffect(() => {
+    if (!data?.sessionLoadWarning) {
+      return;
+    }
+
+    setNotice((current) =>
+      current ?? { tone: "warning", text: data.sessionLoadWarning as string },
+    );
+  }, [data?.sessionLoadWarning]);
 
   useEffect(() => {
     if (!activeSession) {
@@ -131,6 +165,62 @@ export function FocusPage() {
     return () => window.clearInterval(timer);
   }, [activeSession]);
 
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== "active") {
+      return;
+    }
+
+    async function reportInterruption(reason: "tab_hidden" | "window_blur") {
+      const now = Date.now();
+
+      if (
+        interruptionLockRef.current ||
+        now - lastInterruptionAtRef.current < INTERRUPTION_COOLDOWN_MS
+      ) {
+        return;
+      }
+
+      interruptionLockRef.current = true;
+      lastInterruptionAtRef.current = now;
+
+      try {
+        const updated = await studyFocusV1Api.reportStudySessionInterruption(
+          activeSession.id,
+          reason,
+        );
+        syncOpenSession(updated);
+      } catch (reason) {
+        setNotice({
+          tone: "warning",
+          text: getReadableErrorMessage(
+            reason,
+            "已偵測到離開頁面，但中斷狀態同步失敗。",
+          ),
+        });
+      } finally {
+        interruptionLockRef.current = false;
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void reportInterruption("tab_hidden");
+      }
+    }
+
+    function handleWindowBlur() {
+      void reportInterruption("window_blur");
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [activeSession]);
+
   const secondsRemaining = activeSession
     ? Math.max(SESSION_SECONDS - elapsedSeconds, 0)
     : SESSION_SECONDS;
@@ -146,26 +236,49 @@ export function FocusPage() {
     try {
       if (activeSession && activeSession.status === "paused") {
         const resumed = await studyFocusV1Api.resumeStudySession(activeSession.id);
-        setActiveSession(resumed);
+        syncOpenSession(resumed);
         setNotice({ tone: "success", text: "已繼續本輪專注。" });
         return;
       }
 
-      if (!selectedGroupId || !selectedSubjectId) {
-        setNotice({ tone: "error", text: "請先選擇科目與小組。" });
+      if (!selectedGroupId) {
+        setNotice({ tone: "error", text: "請先加入或選擇小組。" });
+        return;
+      }
+
+      if (!selectedSubjectId) {
+        setNotice({ tone: "error", text: "請先選擇科目。" });
         return;
       }
 
       const created = await studyFocusV1Api.createStudySession({
         groupId: selectedGroupId,
         title: selectedSubjectId,
-        notes: null,
+        notes: notesDraft.trim() || null,
       });
-      setActiveSession(created);
-      setData((current) => (current ? { ...current, openSession: created } : current));
+      syncOpenSession(created);
       setNotice({ tone: "success", text: "專注計時已開始，保持節奏！" });
     } catch (reason) {
       setNotice({ tone: "error", text: getReadableErrorMessage(reason, "開始專注失敗。") });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handlePause() {
+    if (!activeSession) {
+      return;
+    }
+
+    setNotice(null);
+    setPendingAction("pause");
+
+    try {
+      const paused = await studyFocusV1Api.pauseStudySession(activeSession.id);
+      syncOpenSession(paused);
+      setNotice({ tone: "success", text: "已暫停這輪專注。" });
+    } catch (reason) {
+      setNotice({ tone: "error", text: getReadableErrorMessage(reason, "暫停失敗。") });
     } finally {
       setPendingAction(null);
     }
@@ -179,17 +292,18 @@ export function FocusPage() {
     try {
       const stopped = await studyFocusV1Api.stopStudySession(activeSession.id);
       const completedMinutes = Math.max(1, Math.round(stopped.effectiveDurationSeconds / 60));
-      setActiveSession(null);
+      syncOpenSession(null);
       setData((current) =>
         current
           ? {
               ...current,
               openSession: null,
               todaySessionCount: current.todaySessionCount + 1,
-              todayTotalMinutes: Math.max(
-                current.todayTotalMinutes + completedMinutes,
-                Math.round((dailyTotalDisplaySeconds - runningSessionSeconds + stopped.effectiveDurationSeconds) / 60),
-              ),
+              todayTotalMinutes: current.todayTotalMinutes + completedMinutes,
+              dailyGoal: {
+                ...current.dailyGoal,
+                currentMinutes: current.dailyGoal.currentMinutes + completedMinutes,
+              },
             }
           : current,
       );
@@ -231,16 +345,37 @@ export function FocusPage() {
     );
   }
 
+  if (data.groups.length === 0 && !data.openSession && !activeSession) {
+    return (
+      <div className="page">
+        <EmptyState
+          title="還不能開始專注"
+          description="你還沒有加入任何小組，所以目前沒有可綁定的專注 session。"
+          action={
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => router.push("/groups")}
+            >
+              先去加入小組
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
   const navItems: Array<{ label: string; href: Route }> = [
-    { label: "concent", href: "/focus" },
-    { label: "group", href: "/groups" },
-    { label: "plan", href: "/exams" },
-    { label: "group", href: "/groups" },
-    { label: "record", href: "/leaderboard" },
-    { label: "mine", href: "/profile" },
+    { label: "首頁", href: "/" },
+    { label: "專注", href: "/focus" },
+    { label: "小組", href: "/groups" },
+    { label: "考試", href: "/exams" },
+    { label: "排行", href: "/leaderboard" },
+    { label: "我的", href: "/profile" },
   ];
 
   const canShowRunningLayout = activeSession?.status === "active";
+  const isPaused = activeSession?.status === "paused";
 
   function handleStopDragStart(clientY: number) {
     if (!canShowRunningLayout || pendingAction !== null) {
@@ -288,7 +423,7 @@ export function FocusPage() {
             <div key={`${item.label}-${index}`} className="focus-mobile__nav-wrap">
               <button
                 type="button"
-                className={`focus-mobile__nav-item ${index === 0 ? "is-primary" : ""}`}
+                className={`focus-mobile__nav-item ${item.href === "/focus" ? "is-primary" : ""}`}
                 onClick={() => {
                   setIsSidebarOpen(false);
                   router.push(item.href);
@@ -326,7 +461,7 @@ export function FocusPage() {
         <header className="focus-mobile__header">
           <p>Learning time</p>
           <strong>{formatHHMMSS(dailyTotalDisplaySeconds)}</strong>
-          <em>Be confident</em>
+          <em>{isPaused ? "Paused safely" : "Be confident"}</em>
         </header>
 
         <div className="focus-mobile__controls">
@@ -366,24 +501,38 @@ export function FocusPage() {
 
         {!canShowRunningLayout ? (
           <div className="focus-mobile__idle">
-            <p className="focus-mobile__start-label">start</p>
-            <button
-              type="button"
-              className="focus-mobile__start-bar"
-              onClick={() => void handleStartOrResume()}
-              disabled={pendingAction !== null}
-              aria-label="start study session"
-            />
-            {activeSession?.status === "paused" ? (
+            <p className="focus-mobile__start-label">{isPaused ? "paused" : "start"}</p>
+            {isPaused ? (
+              <>
+                <strong>{formatMMSS(elapsedSeconds)}</strong>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--small"
+                    onClick={() => void handleStartOrResume()}
+                    disabled={pendingAction !== null}
+                  >
+                    {pendingAction === "start" ? "繼續中..." : "繼續"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--small"
+                    onClick={() => void handleStop()}
+                    disabled={pendingAction !== null}
+                  >
+                    {pendingAction === "stop" ? "結束中..." : "結束"}
+                  </button>
+                </div>
+              </>
+            ) : (
               <button
                 type="button"
-                className="focus-mobile__resume-button"
+                className="focus-mobile__start-bar"
                 onClick={() => void handleStartOrResume()}
                 disabled={pendingAction !== null}
-              >
-                繼續暫停中的專注
-              </button>
-            ) : null}
+                aria-label="start study session"
+              />
+            )}
           </div>
         ) : (
           <div className="focus-mobile__running">
@@ -421,22 +570,37 @@ export function FocusPage() {
               <span>stop</span>
               <span>{formatMMSS(elapsedSeconds)}</span>
             </div>
-            <button
-              type="button"
-              className="focus-mobile__stop-fallback"
-              onClick={() => void handleStop()}
-              disabled={pendingAction !== null}
-            >
-              停止（備用）
-            </button>
+            <div className="button-row">
+              <button
+                type="button"
+                className="btn btn--secondary btn--small"
+                onClick={() => void handlePause()}
+                disabled={pendingAction !== null}
+              >
+                {pendingAction === "pause" ? "暫停中..." : "暫停"}
+              </button>
+              <button
+                type="button"
+                className="focus-mobile__stop-fallback"
+                onClick={() => void handleStop()}
+                disabled={pendingAction !== null}
+              >
+                {pendingAction === "stop" ? "停止中..." : "停止（備用）"}
+              </button>
+            </div>
           </div>
         )}
 
         <div className="focus-mobile__meta">
           <p>今日場次 {data.todaySessionCount}</p>
-          <p>目標 {data.dailyGoal.currentMinutes}/{data.dailyGoal.targetMinutes} 分鐘</p>
+          <p>
+            目標 {data.dailyGoal.currentMinutes}/{data.dailyGoal.targetMinutes} 分鐘
+          </p>
           <p>在線 {data.currentlyStudyingCount}</p>
           <p>剩餘 {formatMMSS(secondsRemaining)}</p>
+          <p>
+            狀態 {canShowRunningLayout ? "專注中" : isPaused ? "暫停中" : "待開始"}
+          </p>
         </div>
       </section>
 

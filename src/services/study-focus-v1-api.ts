@@ -16,6 +16,7 @@ import {
   buildStudySessionStopRoute,
 } from "@/contracts";
 import { requestJson } from "@/services/api-client";
+import { createMockStudyFocusV1Api } from "@/services/mock-study-focus-v1-api";
 
 export interface CreateStudySessionRequest {
   groupId: string;
@@ -65,7 +66,7 @@ export interface StudyFocusV1Api {
 
 let cachedApi: StudyFocusV1Api | null = null;
 
-function createStudyFocusV1Api(): StudyFocusV1Api {
+function createHttpStudyFocusV1Api(): StudyFocusV1Api {
   return {
     listOpenStudySessions() {
       return requestJson<StudySessionDto[]>(
@@ -140,6 +141,16 @@ function createStudyFocusV1Api(): StudyFocusV1Api {
       });
     },
   };
+}
+
+function createStudyFocusV1Api(): StudyFocusV1Api {
+  const source = process.env.NEXT_PUBLIC_STUDY_FOCUS_DATA_SOURCE;
+
+  if (source === "mock") {
+    return createMockStudyFocusV1Api() as StudyFocusV1Api;
+  }
+
+  return createHttpStudyFocusV1Api();
 }
 
 export function getStudyFocusV1Api() {

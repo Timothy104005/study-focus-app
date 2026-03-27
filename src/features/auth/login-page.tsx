@@ -7,7 +7,6 @@ import { NoticeBanner } from "@/components/ui/state-panels";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 
-
 function resolveAuthError(errorMessage: string) {
   if (errorMessage.includes("Invalid login credentials")) {
     return "帳號或密碼錯誤，請重新確認。";
@@ -23,6 +22,7 @@ function resolveAuthError(errorMessage: string) {
 export function LoginPage() {
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") ?? "/focus";
+  const isMockMode = process.env.NEXT_PUBLIC_STUDY_FOCUS_DATA_SOURCE === "mock";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<{
@@ -31,12 +31,23 @@ export function LoginPage() {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<"login" | "register" | null>(null);
 
+  function redirectToNextPath() {
+    const redirectPath = nextPath.startsWith("/") ? nextPath : "/focus";
+    window.location.assign(redirectPath);
+  }
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice(null);
     setIsSubmitting("login");
 
     try {
+      if (isMockMode) {
+        setNotice({ text: "Mock 模式已略過實際登入，直接進入 MVP。", tone: "success" });
+        redirectToNextPath();
+        return;
+      }
+
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -44,8 +55,7 @@ export function LoginPage() {
         throw error;
       }
 
-      const redirectPath = nextPath.startsWith("/") ? nextPath : "/focus";
-      window.location.assign(redirectPath);
+      redirectToNextPath();
     } catch (reason) {
       const fallback = getReadableErrorMessage(reason, "登入失敗，請稍後再試。");
       setNotice({
@@ -62,6 +72,12 @@ export function LoginPage() {
     setIsSubmitting("register");
 
     try {
+      if (isMockMode) {
+        setNotice({ text: "Mock 模式已建立示範登入，直接前往專注頁。", tone: "success" });
+        window.location.assign("/focus");
+        return;
+      }
+
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signUp({ email, password });
 
