@@ -1,5 +1,6 @@
 import { GroupDetailPage } from "@/features/groups/group-detail-page";
 
+export const dynamic = "force-dynamic";
 export default async function GroupDetailRoute({
   params,
 }: {
