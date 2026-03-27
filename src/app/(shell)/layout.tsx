@@ -9,12 +9,10 @@ export default function AppShellLayout({
   return (
     <div className="shell">
       <aside className="shell-sidebar">
-        <div className="brand-card">
-          <p className="eyebrow">Study Focus</p>
+        <div className="brand-card shell-brand-card">
+          <p className="eyebrow">StudyFocus</p>
           <h1 className="brand-title">讀書班</h1>
-          <p className="brand-description">
-            保持節奏、看見進步，也讓小組一起慢慢往前走。
-          </p>
+          <p className="brand-description">專注、比較、調整，讓每天都往前一點點。</p>
         </div>
 
         <SiteNavigation />
@@ -31,7 +29,7 @@ export default function AppShellLayout({
         <div className="shell-topbar">
           <div className="stack-xs">
             <span className="eyebrow">今日任務</span>
-            <strong className="shell-topbar__title">穩穩讀，慢慢追上前排</strong>
+            <strong className="shell-topbar__title">先守住節奏，成績自然往上</strong>
           </div>
           <Link href="/login" className="text-link shell-topbar__link">
             帳號登入

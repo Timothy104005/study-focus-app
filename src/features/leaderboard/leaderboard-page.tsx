@@ -200,12 +200,14 @@ export function LeaderboardPage() {
                   <div className="leaderboard-row__meta">
                     <span
                       className={
-                        entry.rank <= 3
-                          ? "leaderboard-rank leaderboard-rank--top"
-                          : "leaderboard-rank"
+                        entry.rank === 1
+                          ? "leaderboard-rank leaderboard-rank--first"
+                          : entry.rank <= 3
+                            ? "leaderboard-rank leaderboard-rank--top"
+                            : "leaderboard-rank"
                       }
                     >
-                      {entry.rank}
+                      #{entry.rank}
                     </span>
 
                     <div className="stack-xs">

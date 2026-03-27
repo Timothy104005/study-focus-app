@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { NoticeBanner } from "@/components/ui/state-panels";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getReadableErrorMessage } from "@/lib/ui-error";
@@ -86,11 +85,11 @@ export function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-panel">
-        <PageHeader
-          eyebrow="登入"
-          title="使用 Email 與密碼登入"
-          description="輸入帳號密碼後即可開始專注計時。"
-        />
+        <div className="auth-brand">
+          <p className="eyebrow">登入</p>
+          <h1 className="auth-brand__title">StudyFocus</h1>
+          <p className="page-description">使用 Email 與密碼登入，回到今天的專注節奏。</p>
+        </div>
 
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
@@ -126,21 +125,19 @@ export function LoginPage() {
             />
           </div>
 
-          <div className="button-row">
-            <Button type="submit" disabled={isSubmitting !== null} fullWidth>
-              {isSubmitting === "login" ? "登入中..." : "登入"}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isSubmitting !== null}
-              fullWidth
-              onClick={() => void handleRegister()}
-            >
-              {isSubmitting === "register" ? "註冊中..." : "註冊"}
-            </Button>
-          </div>
+          <Button type="submit" disabled={isSubmitting !== null} fullWidth>
+            {isSubmitting === "login" ? "登入中..." : "登入"}
+          </Button>
         </form>
+
+        <button
+          type="button"
+          className="auth-register-link"
+          disabled={isSubmitting !== null}
+          onClick={() => void handleRegister()}
+        >
+          {isSubmitting === "register" ? "註冊中..." : "還沒有帳號？註冊"}
+        </button>
       </div>
     </div>
   );

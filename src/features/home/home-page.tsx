@@ -67,16 +67,26 @@ export function HomePage() {
   const leadingHighlight = data.classHighlights[0];
 
   return (
-    <div className="page stack-lg">
+    <div className="page stack-lg dashboard-page">
       <PageHeader
         eyebrow="今日總覽"
         title="今天先讀穩，名次就會慢慢往前。"
         description="用最少的干擾掌握專注時數、班級節奏、小組狀態和最近的考試壓力。"
       />
 
+      <section className="dashboard-goal-card">
+        <div className="stack-xs">
+          <h2 className="section-title">今天的目標</h2>
+          <p className="meta-text">先完成今天該讀的分鐘數，再看延伸練習。</p>
+        </div>
+        <p className="dashboard-goal-card__minutes">{formatMinutes(data.todayMinutes)}</p>
+      </section>
+
       <NoticeBanner tone={data.achievementFeedback.tone}>
         <strong>{data.achievementFeedback.title}</strong> {data.achievementFeedback.message}
       </NoticeBanner>
+
+      <hr className="page-divider" />
 
       <section className="hero-card home-hero">
         <div className="stack-md">
@@ -112,6 +122,8 @@ export function HomePage() {
         </div>
       </section>
 
+      <hr className="page-divider" />
+
       <div className="stats-grid">
         <article className="stat-card">
           <span className="stat-label">今日累積</span>
@@ -146,6 +158,8 @@ export function HomePage() {
           </span>
         </article>
       </div>
+
+      <hr className="page-divider" />
 
       <div className="dashboard-hero">
         <SectionCard
