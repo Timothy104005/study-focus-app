@@ -2,6 +2,7 @@
 
 import { StudyBarChart } from "@/components/charts/study-bar-chart";
 import { RecentSessions } from "@/components/shared/recent-sessions";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/section-card";
 import {
@@ -60,6 +61,24 @@ export function ProfilePage() {
 
   return (
     <div className="page stack-lg">
+      <section className="profile-hero">
+        <div className="profile-avatar" aria-hidden="true">
+          {data.user.name.slice(0, 1)}
+        </div>
+        <div className="stack-xs">
+          <h2 className="section-title">{data.user.name}</h2>
+          <p className="meta-text">{data.user.className}</p>
+        </div>
+        <div className="button-row">
+          <Link href="/focus" className="btn btn--primary btn--small">
+            開始專注
+          </Link>
+          <Link href="/leaderboard" className="btn btn--primary btn--small">
+            看排行榜
+          </Link>
+        </div>
+      </section>
+
       <PageHeader
         eyebrow="個人統計"
         title={`${data.user.name} 的讀書節奏`}
