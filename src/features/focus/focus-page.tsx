@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { Route } from "next";
 import {
   AuthRequiredState,
   EmptyState,
@@ -15,6 +13,7 @@ import type { GroupSummary, SubjectTag } from "@/contracts/study-focus";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { localizeSubjectTags } from "@/lib/study-subjects";
 import { getReadableErrorMessage } from "@/lib/ui-error";
+import { AppDrawer } from "@/components/app-drawer";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 import { getStudyFocusV1Api } from "@/services/study-focus-v1-api";
 
@@ -79,7 +78,6 @@ async function loadFocusPageData(): Promise<FocusPageData> {
 }
 
 export function FocusPage() {
-  const router = useRouter();
   const { data, errorMessage, errorStatus, isError, isLoading, reload, setData } =
     useAsyncData(loadFocusPageData, []);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
@@ -231,15 +229,6 @@ export function FocusPage() {
     );
   }
 
-  const navItems: Array<{ label: string; href: Route }> = [
-    { label: "concent", href: "/focus" },
-    { label: "group", href: "/groups" },
-    { label: "plan", href: "/exams" },
-    { label: "group", href: "/groups" },
-    { label: "record", href: "/leaderboard" },
-    { label: "mine", href: "/profile" },
-  ];
-
   const canShowRunningLayout = activeSession?.status === "active";
 
   function handleStopDragStart(clientY: number) {
@@ -274,42 +263,7 @@ export function FocusPage() {
 
   return (
     <div className="page focus-mobile">
-      <aside className={`focus-mobile__sidebar ${isSidebarOpen ? "is-open" : ""}`}>
-        <button
-          type="button"
-          className="focus-mobile__close-sidebar"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-label="Close sidebar"
-        >
-          ×
-        </button>
-        <nav className="focus-mobile__nav">
-          {navItems.map((item, index) => (
-            <div key={`${item.label}-${index}`} className="focus-mobile__nav-wrap">
-              <button
-                type="button"
-                className={`focus-mobile__nav-item ${index === 0 ? "is-primary" : ""}`}
-                onClick={() => {
-                  setIsSidebarOpen(false);
-                  router.push(item.href);
-                }}
-              >
-                {item.label}
-              </button>
-              {index < navItems.length - 1 ? <span className="focus-mobile__nav-square" /> : null}
-            </div>
-          ))}
-        </nav>
-      </aside>
-
-      {isSidebarOpen ? (
-        <button
-          type="button"
-          className="focus-mobile__sidebar-backdrop"
-          onClick={() => setIsSidebarOpen(false)}
-          aria-label="close sidebar overlay"
-        />
-      ) : null}
+      <AppDrawer isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       <section className="focus-mobile__canvas">
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
@@ -317,7 +271,7 @@ export function FocusPage() {
           type="button"
           className="focus-mobile__sidebar-trigger"
           onClick={() => setIsSidebarOpen(true)}
-          aria-label="open sidebar"
+          aria-label="開啟導覽"
         >
           ☰
         </button>
