@@ -1,34 +1,21 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
-import { AppDrawer } from "@/components/app-drawer";
+import { AppShellLayoutClient } from "@/app/(shell)/app-shell-layout-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default function AppShellLayout({
+export default async function AppShellLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const shouldHideHamburger = pathname.startsWith("/focus");
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  return (
-    <div className="shell-mobile">
-      <AppDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+  if (!session) {
+    redirect("/login");
+  }
 
-      {!shouldHideHamburger ? (
-        <button
-          type="button"
-          className="shell-mobile__hamburger"
-          onClick={() => setIsDrawerOpen(true)}
-          aria-label="開啟導覽"
-        >
-          ≡
-        </button>
-      ) : null}
-
-      <main className="shell-mobile__content">{children}</main>
-    </div>
-  );
+  return <AppShellLayoutClient>{children}</AppShellLayoutClient>;
 }
