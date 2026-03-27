@@ -1,99 +1,136 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { NoticeBanner } from "@/components/ui/state-panels";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 
+type AuthMode = "login" | "register";
 
-function resolveAuthError(errorMessage: string) {
+function resolveLoginError(errorMessage: string) {
   if (errorMessage.includes("Invalid login credentials")) {
     return "帳號或密碼錯誤，請重新確認。";
   }
 
   if (errorMessage.includes("Email not confirmed")) {
-    return "帳號尚未啟用，請聯絡管理員。";
+    return "信箱尚未驗證，請先完成驗證。";
   }
 
   return "登入失敗，請稍後再試。";
 }
 
+function resolveRegisterError(errorMessage: string) {
+  if (errorMessage.includes("User already registered")) {
+    return "此 Email 已註冊，請直接登入。";
+  }
+
+  if (errorMessage.includes("Password should be at least")) {
+    return "密碼長度不足，請至少輸入 6 個字元。";
+  }
+
+  return "註冊失敗，請稍後再試。";
+}
+
 export function LoginPage() {
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/focus";
+  const nextPath = searchParams.get("next") ?? "/";
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<{
     text: string;
     tone: "error" | "success";
   } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState<"login" | "register" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  const modeTitle = useMemo(() => (mode === "login" ? "登入" : "註冊"), [mode]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice(null);
-    setIsSubmitting("login");
+    setIsSubmitting(true);
 
     try {
       const supabase = createSupabaseBrowserClient();
+
+      if (mode === "register") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              display_name: displayName.trim() || undefined,
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        setNotice({ text: "註冊成功，正在前往首頁。", tone: "success" });
+        window.location.assign("/");
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         throw error;
       }
 
-      const redirectPath = nextPath.startsWith("/") ? nextPath : "/focus";
+      const redirectPath = nextPath.startsWith("/") ? nextPath : "/";
       window.location.assign(redirectPath);
     } catch (reason) {
-      const fallback = getReadableErrorMessage(reason, "登入失敗，請稍後再試。");
+      const fallback = getReadableErrorMessage(reason, mode === "login" ? "登入失敗，請稍後再試。" : "註冊失敗，請稍後再試。");
       setNotice({
-        text: resolveAuthError(fallback),
+        text: mode === "login" ? resolveLoginError(fallback) : resolveRegisterError(fallback),
         tone: "error",
       });
     } finally {
-      setIsSubmitting(null);
+      setIsSubmitting(false);
     }
   }
 
-  async function handleRegister() {
+  function handleToggleMode() {
     setNotice(null);
-    setIsSubmitting("register");
-
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const { error } = await supabase.auth.signUp({ email, password });
-
-      if (error) {
-        throw error;
-      }
-
-      setNotice({ text: "註冊成功，正在前往專注頁面。", tone: "success" });
-      window.location.assign("/focus");
-    } catch (reason) {
-      const fallback = getReadableErrorMessage(reason, "註冊失敗，請稍後再試。");
-      setNotice({
-        text: resolveAuthError(fallback).replace("登入", "註冊"),
-        tone: "error",
-      });
-    } finally {
-      setIsSubmitting(null);
-    }
+    setMode((currentMode) => (currentMode === "login" ? "register" : "login"));
   }
 
   return (
     <div className="auth-shell">
       <div className="auth-panel">
         <div className="auth-brand">
-          <p className="eyebrow">登入</p>
+          <p className="eyebrow">{modeTitle}</p>
           <h1 className="auth-brand__title">StudyFocus</h1>
-          <p className="page-description">使用 Email 與密碼登入，回到今天的專注節奏。</p>
+          <p className="page-description">
+            {mode === "login" ? "使用 Email 與密碼登入，回到今天的專注節奏。" : "建立新帳號，開始你的每日專注學習。"}
+          </p>
         </div>
 
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
-        <form className="field-grid" onSubmit={handleLogin}>
+        <form className="field-grid" onSubmit={handleSubmit}>
+          {mode === "register" ? (
+            <div className="stack-xs">
+              <label className="field-label" htmlFor="register-display-name">
+                顯示名稱（選填）
+              </label>
+              <input
+                id="register-display-name"
+                type="text"
+                className="input"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="例如：小明"
+              />
+            </div>
+          ) : null}
+
           <div className="stack-xs">
             <label className="field-label" htmlFor="login-email">
               Email
@@ -125,18 +162,13 @@ export function LoginPage() {
             />
           </div>
 
-          <Button type="submit" disabled={isSubmitting !== null} fullWidth>
-            {isSubmitting === "login" ? "登入中..." : "登入"}
+          <Button type="submit" disabled={isSubmitting} fullWidth>
+            {isSubmitting ? `${modeTitle}中...` : modeTitle}
           </Button>
         </form>
 
-        <button
-          type="button"
-          className="auth-register-link"
-          disabled={isSubmitting !== null}
-          onClick={() => void handleRegister()}
-        >
-          {isSubmitting === "register" ? "註冊中..." : "還沒有帳號？註冊"}
+        <button type="button" className="auth-register-link" disabled={isSubmitting} onClick={handleToggleMode}>
+          {mode === "login" ? "還沒有帳號？註冊" : "已有帳號？登入"}
         </button>
       </div>
     </div>
