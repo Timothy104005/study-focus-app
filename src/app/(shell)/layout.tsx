@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AppShellLayoutClient } from "@/app/(shell)/app-shell-layout-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function AppShellLayout({
   children,
 }: {
