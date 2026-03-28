@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   AuthRequiredState,
   EmptyState,
@@ -97,6 +98,7 @@ export function FocusPage() {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDraggingStop, setIsDraggingStop] = useState(false);
   const dragStartYRef = useRef<number | null>(null);
+  const isInterruptingFromTabBlurRef = useRef(false);
 
   useEffect(() => {
     if (!data) {
@@ -127,6 +129,47 @@ export function FocusPage() {
     }, 1000);
 
     return () => window.clearInterval(timer);
+  }, [activeSession]);
+
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== "active") {
+      isInterruptingFromTabBlurRef.current = false;
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") {
+        return;
+      }
+      if (isInterruptingFromTabBlurRef.current) {
+        return;
+      }
+
+      isInterruptingFromTabBlurRef.current = true;
+      void studyFocusV1Api
+        .interruptStudySession(activeSession.id, "tab_blur")
+        .then((interruptedSession) => {
+          setActiveSession(interruptedSession);
+          setNotice({
+            tone: "error",
+            text: "偵測到切換分頁，已中斷本輪專注，請回到頁面後重新開始。",
+          });
+        })
+        .catch((reason) => {
+          setNotice({
+            tone: "error",
+            text: getReadableErrorMessage(reason, "切換分頁時中斷專注失敗。"),
+          });
+        })
+        .finally(() => {
+          isInterruptingFromTabBlurRef.current = false;
+        });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [activeSession]);
 
   const secondsRemaining = activeSession
@@ -230,6 +273,7 @@ export function FocusPage() {
   }
 
   const canShowRunningLayout = activeSession?.status === "active";
+  const hasGroups = data.groups.length > 0;
 
   function handleStopDragStart(clientY: number) {
     if (!canShowRunningLayout || pendingAction !== null) {
@@ -308,7 +352,7 @@ export function FocusPage() {
             className="select"
             value={selectedGroupId}
             onChange={(event) => setSelectedGroupId(event.target.value)}
-            disabled={Boolean(activeSession)}
+            disabled={Boolean(activeSession) || !hasGroups}
           >
             {data.groups.map((group) => (
               <option key={group.id} value={group.id}>
@@ -318,16 +362,28 @@ export function FocusPage() {
           </select>
         </div>
 
+        {!hasGroups ? (
+          <NoticeBanner tone="error">
+            目前尚未加入任何小組，請先前往
+            {" "}
+            <Link href="/groups">小組頁面</Link>
+            {" "}
+            建立或加入小組後再開始專注。
+          </NoticeBanner>
+        ) : null}
+
         {!canShowRunningLayout ? (
           <div className="focus-mobile__idle">
             <p className="focus-mobile__start-label">start</p>
-            <button
-              type="button"
-              className="focus-mobile__start-bar"
-              onClick={() => void handleStartOrResume()}
-              disabled={pendingAction !== null}
-              aria-label="start study session"
-            />
+            {hasGroups ? (
+              <button
+                type="button"
+                className="focus-mobile__start-bar"
+                onClick={() => void handleStartOrResume()}
+                disabled={pendingAction !== null}
+                aria-label="start study session"
+              />
+            ) : null}
             {activeSession?.status === "paused" ? (
               <button
                 type="button"
