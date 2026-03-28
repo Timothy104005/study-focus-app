@@ -37,6 +37,10 @@ export interface StudyFocusV1Api {
   pauseStudySession(sessionId: string): Promise<StudySessionDto>;
   resumeStudySession(sessionId: string): Promise<StudySessionDto>;
   stopStudySession(sessionId: string): Promise<StudySessionDto>;
+  interruptStudySession(
+    sessionId: string,
+    reason: InterruptionReason | "tab_blur",
+  ): Promise<StudySessionDto>;
   reportStudySessionInterruption(
     sessionId: string,
     reason: InterruptionReason,
@@ -91,6 +95,14 @@ function createStudyFocusV1Api(): StudyFocusV1Api {
     stopStudySession(sessionId) {
       return requestJson<StudySessionDto>(buildStudySessionStopRoute(sessionId), {
         method: "POST",
+      });
+    },
+    interruptStudySession(sessionId, reason) {
+      const mappedReason: InterruptionReason =
+        reason === "tab_blur" ? "tab_hidden" : reason;
+      return requestJson<StudySessionDto>(buildStudySessionInterruptRoute(sessionId), {
+        method: "POST",
+        body: JSON.stringify({ reason: mappedReason }),
       });
     },
     reportStudySessionInterruption(sessionId, reason) {
