@@ -58,7 +58,7 @@ export function LoginPage() {
       const supabase = createSupabaseBrowserClient();
 
       if (mode === "register") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -70,6 +70,14 @@ export function LoginPage() {
 
         if (error) {
           throw error;
+        }
+
+        if (!data.session) {
+          setNotice({
+            text: "我們已寄出確認信，請先到信箱驗證後再登入。",
+            tone: "success",
+          });
+          return;
         }
 
         setNotice({ text: "註冊成功，正在前往首頁。", tone: "success" });

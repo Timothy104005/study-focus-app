@@ -50,6 +50,7 @@ async function ensureUser(email: string, displayName: string) {
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
+    password: "StudyFocus2026!",
     email_confirm: true,
     user_metadata: {
       display_name: displayName,
