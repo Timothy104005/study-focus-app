@@ -81,6 +81,7 @@ For non-Vercel Node hosting, the minimal release flow is still:
 
 - Demo invite code: `BIO101A1`
 - Demo emails: `owner@example.com`, `member1@example.com`, `member2@example.com`
+- Demo password: `StudyFocus2026!`
 
 ## Notes
 

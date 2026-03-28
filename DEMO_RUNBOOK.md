@@ -22,6 +22,12 @@ Then open:
 - `http://localhost:3011/exams`
 - `http://localhost:3011/profile`
 
+## Demo Login Credentials
+
+- `owner@example.com` / `StudyFocus2026!`
+- `member1@example.com` / `StudyFocus2026!`
+- `member2@example.com` / `StudyFocus2026!`
+
 ## What Is Safe To Demo Locally Right Now
 
 - Login request UI: enter an email and reach the "check your inbox" state.
