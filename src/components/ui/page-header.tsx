@@ -15,6 +15,10 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className="page-header">
+      <div className="page-header__motif" aria-hidden="true">
+        <span className="page-header__motif-v" />
+        <span className="page-header__motif-h" />
+      </div>
       <div className="stack-sm">
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1 className="page-title">{title}</h1>

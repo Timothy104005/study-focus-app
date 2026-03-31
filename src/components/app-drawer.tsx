@@ -6,11 +6,11 @@ import type { Route } from "next";
 import { cn } from "@/lib/cn";
 
 const drawerItems: Array<{ href: Route; label: string }> = [
-  { href: "/focus", label: "Focus" },
-  { href: "/groups", label: "Groups" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/profile", label: "Profile" },
-  { href: "/exams", label: "Exams" },
+  { href: "/focus", label: "專注" },
+  { href: "/groups", label: "小組" },
+  { href: "/exams", label: "計畫" },
+  { href: "/leaderboard", label: "紀錄" },
+  { href: "/profile", label: "我的" },
 ];
 
 interface AppDrawerProps {

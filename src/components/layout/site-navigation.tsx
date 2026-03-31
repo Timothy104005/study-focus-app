@@ -6,11 +6,11 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
 const navigationItems: Array<{ href: Route; label: string; shortLabel: string }> = [
-  { href: "/focus", label: "Focus", shortLabel: "Focus" },
-  { href: "/groups", label: "Groups", shortLabel: "Groups" },
-  { href: "/leaderboard", label: "Leaderboard", shortLabel: "排行" },
-  { href: "/profile", label: "Profile", shortLabel: "我的" },
-  { href: "/exams", label: "Exams", shortLabel: "考試" },
+  { href: "/focus", label: "專注", shortLabel: "專注" },
+  { href: "/groups", label: "小組", shortLabel: "小組" },
+  { href: "/exams", label: "計畫", shortLabel: "計畫" },
+  { href: "/leaderboard", label: "紀錄", shortLabel: "紀錄" },
+  { href: "/profile", label: "我的", shortLabel: "我的" },
 ];
 
 export function SiteNavigation() {

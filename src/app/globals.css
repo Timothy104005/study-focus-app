@@ -1324,3 +1324,155 @@ button {
     max-width: 380px;
   }
 }
+
+
+/* Design Focus V2 overrides */
+:root {
+  --color-vanilla: #f4f4f2;
+  --color-sage: #9cb0ad;
+  --color-bloodstone: #b84040;
+  --color-brandy: #656470;
+  --color-chalk: #eceae6;
+  --color-navy: #567393;
+  --surface: #f7f7f5;
+  --surface-muted: #e6e3de;
+  --line: color-mix(in srgb, var(--color-sage) 86%, white 14%);
+  --text: #14151a;
+  --text-muted: #444957;
+}
+
+.page {
+  padding-top: 26px;
+}
+
+.page-header__motif {
+  position: relative;
+  width: 132px;
+  height: 52px;
+}
+
+.page-header__motif-v,
+.page-header__motif-h {
+  position: absolute;
+  display: block;
+  background: var(--color-sage);
+}
+
+.page-header__motif-v {
+  top: 0;
+  left: 18px;
+  width: 6px;
+  height: 52px;
+}
+
+.page-header__motif-h {
+  top: 32px;
+  left: 0;
+  width: 132px;
+  height: 6px;
+}
+
+.page-title {
+  font-size: clamp(1.8rem, 5.2vw, 2.7rem);
+  line-height: 1.15;
+}
+
+.card,
+.auth-panel,
+.modal-card,
+.state-card {
+  border-radius: 10px;
+  border-width: 2px;
+}
+
+.btn {
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.btn--primary {
+  background: var(--color-bloodstone);
+}
+
+.app-drawer {
+  background: #567393;
+  border-right: 10px solid #4b4d5b;
+}
+
+.app-drawer__item {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 36px;
+  padding: 0 12px;
+  background: #4d5462;
+  border-radius: 2px;
+  color: #f6f5f0;
+}
+
+.app-drawer__item--active {
+  background: #b84040;
+  color: #fff;
+}
+
+.mobile-nav {
+  background: #567393;
+  border-radius: 8px;
+}
+
+.mobile-nav__link {
+  min-height: 42px;
+  border-radius: 4px;
+}
+
+.mobile-nav__link--active {
+  color: #111;
+}
+
+.auth-shell {
+  background: linear-gradient(90deg, #567393 0 16px, transparent 16px);
+}
+
+.auth-panel {
+  background: #f7f7f5;
+}
+
+.focus-mobile__canvas {
+  border-left-width: 20px;
+  border-left-color: #567393;
+}
+
+.focus-mobile__crossline {
+  border-top-width: 8px;
+}
+
+.focus-mobile__start-bar {
+  border-radius: 0;
+  height: 14px;
+}
+
+.focus-mobile__note-tab {
+  background: #cfc8ba;
+  border-radius: 0;
+}
+
+.group-card,
+.exam-card,
+.stat-card,
+.leaderboard-row,
+.post-card,
+.member-row,
+.session-row {
+  border-radius: 8px;
+}
+
+.subject-pill,
+.chip {
+  border-radius: 3px;
+}
+
+@media (min-width: 720px) {
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+}
