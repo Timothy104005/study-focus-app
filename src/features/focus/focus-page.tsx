@@ -14,12 +14,11 @@ import type { GroupSummary, SubjectTag } from "@/contracts/study-focus";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { localizeSubjectTags } from "@/lib/study-subjects";
 import { getReadableErrorMessage } from "@/lib/ui-error";
-import { AppDrawer } from "@/components/app-drawer";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 import { getStudyFocusV1Api } from "@/services/study-focus-v1-api";
 
 const SESSION_SECONDS = 50 * 60;
-const STOP_DRAG_THRESHOLD_PX = 80;
+const STOP_DRAG_THRESHOLD_PX = 56;
 const studyFocusApi = getStudyFocusApi();
 const studyFocusV1Api = getStudyFocusV1Api();
 
@@ -76,6 +75,88 @@ async function loadFocusPageData(): Promise<FocusPageData> {
       targetMinutes: overview.dailyGoal.targetMinutes,
     },
   };
+}
+
+const focusDrawerItems = [
+  { href: "/focus", label: "Focus" },
+  { href: "/groups", label: "Group" },
+  { href: "/exams", label: "Plan" },
+  { href: "/leaderboard", label: "Record" },
+  { href: "/profile", label: "Mine" },
+] as const;
+
+function FocusCanvasShell({
+  children,
+  isSidebarOpen,
+  onSidebarOpen,
+  onSidebarClose,
+  isNoteOpen,
+  onNoteToggle,
+  notesDraft,
+  onNotesChange,
+}: {
+  children: React.ReactNode;
+  isSidebarOpen: boolean;
+  onSidebarOpen: () => void;
+  onSidebarClose: () => void;
+  isNoteOpen: boolean;
+  onNoteToggle: () => void;
+  notesDraft: string;
+  onNotesChange: (value: string) => void;
+}) {
+  return (
+    <div className="focus-mobile">
+      <section className="focus-mobile__canvas">
+        <div className="focus-mobile__line-vertical" aria-hidden />
+        <div className="focus-mobile__line-horizontal" aria-hidden />
+
+        <button
+          type="button"
+          className="focus-mobile__sidebar-trigger"
+          onClick={onSidebarOpen}
+          aria-label="開啟導覽"
+        >
+          ≡
+        </button>
+
+        {children}
+      </section>
+
+      <aside className={`focus-mobile__drawer ${isSidebarOpen ? "is-open" : ""}`}>
+        <nav className="focus-mobile__drawer-nav" aria-label="Focus 導覽">
+          {focusDrawerItems.map((item) => (
+            <Link key={item.href} href={item.href} className="focus-mobile__drawer-item" onClick={onSidebarClose}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+      <button
+        type="button"
+        className={`focus-mobile__drawer-overlay ${isSidebarOpen ? "is-open" : ""}`}
+        onClick={onSidebarClose}
+        aria-label="關閉導覽"
+      />
+
+      <button
+        type="button"
+        className={`focus-mobile__note-tab ${isNoteOpen ? "is-open" : ""}`}
+        onClick={onNoteToggle}
+      >
+        Note
+      </button>
+
+      <aside className={`focus-mobile__note-panel ${isNoteOpen ? "is-open" : ""}`}>
+        <label htmlFor="focus-note-textarea">筆記 Note</label>
+        <textarea
+          id="focus-note-textarea"
+          value={notesDraft}
+          onChange={(event) => onNotesChange(event.target.value)}
+          placeholder="記錄現在的想法..."
+        />
+      </aside>
+    </div>
+  );
 }
 
 export function FocusPage() {
@@ -244,36 +325,8 @@ export function FocusPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="page">
-        <LoadingState label="正在載入專注頁面..." />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="page">
-        {errorStatus === 401 ? (
-          <AuthRequiredState description="請先登入才能開始專注計時。" />
-        ) : (
-          <ErrorState description={errorMessage ?? "專注頁載入失敗。"} onRetry={reload} />
-        )}
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="page">
-        <EmptyState title="目前沒有專注資料" description="請稍後再試一次。" />
-      </div>
-    );
-  }
-
   const canShowRunningLayout = activeSession?.status === "active";
-  const hasGroups = data.groups.length > 0;
+  const hasGroups = (data?.groups.length ?? 0) > 0;
 
   function handleStopDragStart(clientY: number) {
     if (!canShowRunningLayout || pendingAction !== null) {
@@ -306,25 +359,23 @@ export function FocusPage() {
   }
 
   return (
-    <div className="page focus-mobile">
-      <AppDrawer isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
-      <section className="focus-mobile__canvas">
+    <FocusCanvasShell
+      isSidebarOpen={isSidebarOpen}
+      onSidebarOpen={() => setIsSidebarOpen(true)}
+      onSidebarClose={() => setIsSidebarOpen(false)}
+      isNoteOpen={isNoteOpen}
+      onNoteToggle={() => setIsNoteOpen((current) => !current)}
+      notesDraft={notesDraft}
+      onNotesChange={setNotesDraft}
+    >
+      <div className="focus-mobile__content">
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
-        <button
-          type="button"
-          className="focus-mobile__sidebar-trigger"
-          onClick={() => setIsSidebarOpen(true)}
-          aria-label="開啟導覽"
-        >
-          ☰
-        </button>
-        <div className="focus-mobile__crossline" />
 
         <header className="focus-mobile__header">
           <p>Learning time</p>
           <strong>{formatHHMMSS(dailyTotalDisplaySeconds)}</strong>
           <em>Be confident</em>
+          {canShowRunningLayout ? <span>{formatMMSS(elapsedSeconds)}</span> : null}
         </header>
 
         <div className="focus-mobile__controls">
@@ -333,12 +384,12 @@ export function FocusPage() {
           </label>
           <select
             id="focus-subject"
-            className="select"
+            className="focus-mobile__pill-select"
             value={selectedSubjectId}
             onChange={(event) => setSelectedSubjectId(event.target.value)}
-            disabled={Boolean(activeSession)}
+            disabled={Boolean(activeSession) || !data}
           >
-            {data.subjects.map((subject) => (
+            {data?.subjects.map((subject) => (
               <option key={subject.id} value={subject.id}>
                 {subject.label}
               </option>
@@ -349,12 +400,12 @@ export function FocusPage() {
           </label>
           <select
             id="focus-group"
-            className="select"
+            className="focus-mobile__pill-select"
             value={selectedGroupId}
             onChange={(event) => setSelectedGroupId(event.target.value)}
             disabled={Boolean(activeSession) || !hasGroups}
           >
-            {data.groups.map((group) => (
+            {data?.groups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
               </option>
@@ -362,25 +413,33 @@ export function FocusPage() {
           </select>
         </div>
 
-        {!hasGroups ? (
+        {!hasGroups && data ? (
           <NoticeBanner tone="error">
-            目前尚未加入任何小組，請先前往
-            {" "}
-            <Link href="/groups">小組頁面</Link>
-            {" "}
-            建立或加入小組後再開始專注。
+            目前尚未加入任何小組，請先前往 <Link href="/groups">小組頁面</Link> 建立或加入小組後再開始專注。
           </NoticeBanner>
         ) : null}
 
+        {isLoading ? <LoadingState label="正在載入專注頁面..." /> : null}
+        {isError ? (
+          errorStatus === 401 ? (
+            <AuthRequiredState description="請先登入才能開始專注計時。" />
+          ) : (
+            <ErrorState description={errorMessage ?? "專注頁載入失敗。"} onRetry={reload} />
+          )
+        ) : null}
+        {!isLoading && !isError && !data ? (
+          <EmptyState title="目前沒有專注資料" description="請稍後再試一次。" />
+        ) : null}
+
         {!canShowRunningLayout ? (
-          <div className="focus-mobile__idle">
+          <div className="focus-mobile__start-zone">
             <p className="focus-mobile__start-label">start</p>
             {hasGroups ? (
               <button
                 type="button"
                 className="focus-mobile__start-bar"
                 onClick={() => void handleStartOrResume()}
-                disabled={pendingAction !== null}
+                disabled={pendingAction !== null || isLoading || isError}
                 aria-label="start study session"
               />
             ) : null}
@@ -396,18 +455,15 @@ export function FocusPage() {
             ) : null}
           </div>
         ) : (
-          <div className="focus-mobile__running">
-            <div className="focus-mobile__learning-label">Learning</div>
+          <div className="focus-mobile__start-zone focus-mobile__start-zone--running">
+            <p className="focus-mobile__start-label">start</p>
             <div
-              className="focus-mobile__rising-track"
+              className="focus-mobile__stop-track"
+              onPointerMove={(event) => handleStopDragMove(event.clientY)}
               onPointerUp={handleStopDragEnd}
               onPointerCancel={handleStopDragEnd}
-              onPointerMove={(event) => handleStopDragMove(event.clientY)}
             >
-              <div
-                className="focus-mobile__rising-fill"
-                style={{ height: `${Math.max(barProgress * 100, 6)}%` }}
-              />
+              <div className="focus-mobile__stop-fill" style={{ height: `${Math.max(12, barProgress * 100)}%` }} />
               <button
                 type="button"
                 className="focus-mobile__drag-stop-handle"
@@ -421,52 +477,17 @@ export function FocusPage() {
                   handleStopDragEnd();
                 }}
                 onPointerCancel={handleStopDragEnd}
-                style={{ transform: `translateY(${dragOffset}px)` }}
+                style={{ transform: `translate(-50%, ${dragOffset}px)` }}
                 aria-label="drag down to stop"
-              >
-                ⬇
-              </button>
+              />
             </div>
-            <div className="focus-mobile__running-footer">
-              <span>stop</span>
-              <span>{formatMMSS(elapsedSeconds)}</span>
+            <div className="focus-mobile__session-meta">
+              <span>Session {formatMMSS(elapsedSeconds)}</span>
+              <span>剩餘 {formatMMSS(secondsRemaining)}</span>
             </div>
-            <button
-              type="button"
-              className="focus-mobile__stop-fallback"
-              onClick={() => void handleStop()}
-              disabled={pendingAction !== null}
-            >
-              停止（備用）
-            </button>
           </div>
         )}
-
-        <div className="focus-mobile__meta">
-          <p>今日場次 {data.todaySessionCount}</p>
-          <p>目標 {data.dailyGoal.currentMinutes}/{data.dailyGoal.targetMinutes} 分鐘</p>
-          <p>在線 {data.currentlyStudyingCount}</p>
-          <p>剩餘 {formatMMSS(secondsRemaining)}</p>
-        </div>
-      </section>
-
-      <button
-        type="button"
-        className={`focus-mobile__note-tab ${isNoteOpen ? "is-open" : ""}`}
-        onClick={() => setIsNoteOpen((current) => !current)}
-      >
-        Note
-      </button>
-
-      <aside className={`focus-mobile__note-panel ${isNoteOpen ? "is-open" : ""}`}>
-        <label htmlFor="focus-note-textarea">筆記</label>
-        <textarea
-          id="focus-note-textarea"
-          value={notesDraft}
-          onChange={(event) => setNotesDraft(event.target.value)}
-          placeholder="記錄現在的想法..."
-        />
-      </aside>
-    </div>
+      </div>
+    </FocusCanvasShell>
   );
 }

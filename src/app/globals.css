@@ -1089,238 +1089,285 @@ button {
 }
 
 .focus-mobile {
-  position: relative;
-  background: var(--color-vanilla);
-  color: var(--color-navy);
   min-height: 100vh;
-  overflow: hidden;
+  width: 100%;
+  background: #FFF9EB;
+  display: flex;
+  justify-content: center;
+  position: relative;
 }
 
 .focus-mobile__canvas {
   position: relative;
+  width: min(100%, 440px);
   min-height: 100vh;
-  border-left: 3px solid var(--color-sage);
-  padding: 20px 16px 26px;
+  background: #FFF9EB;
+  overflow: hidden;
 }
 
-.focus-mobile__crossline {
+.focus-mobile__line-vertical {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6%;
+  width: 1px;
+  background: #AAB59E;
+}
+
+.focus-mobile__line-horizontal {
   position: absolute;
   left: 0;
   right: 0;
   top: 30%;
-  border-top: 2px solid var(--color-sage);
+  height: 1px;
+  background: #AAB59E;
 }
 
-.focus-mobile__header {
+.focus-mobile__content {
   position: relative;
-  z-index: 1;
-  margin-top: 18px;
-}
-
-.focus-mobile__header p {
-  margin: 0;
-  color: color-mix(in srgb, var(--color-sage) 72%, var(--color-navy) 28%);
-  font-size: 0.86rem;
-}
-
-.focus-mobile__header strong {
-  display: block;
-  font-size: clamp(2.2rem, 12vw, 4rem);
-  line-height: 1.04;
-  letter-spacing: 0.08em;
-  margin-top: 4px;
-}
-
-.focus-mobile__header em {
-  display: block;
-  text-align: right;
-  margin-top: 12px;
-  color: var(--color-sage);
-  font-size: 0.92rem;
-  font-style: italic;
+  z-index: 2;
+  min-height: 100vh;
+  padding: 18px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 .focus-mobile__sidebar-trigger {
   position: absolute;
-  top: 12px;
-  left: 8px;
-  border: 0;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid #AAB59E;
+  background: #FFF9EB;
   color: var(--color-navy);
-  background: var(--color-vanilla);
-  border: 1px solid var(--color-sage);
-  border-radius: 8px;
-  width: 28px;
-  height: 28px;
-  font-size: 1rem;
+}
+
+.focus-mobile__header {
+  margin-top: 27vh;
+  text-align: center;
+  display: grid;
+  gap: 8px;
+}
+
+.focus-mobile__header p {
+  margin: 0;
+  color: #7E8E7A;
+  font-size: 0.9rem;
+}
+
+.focus-mobile__header strong {
+  display: block;
+  font-size: clamp(2.3rem, 10.5vw, 3.2rem);
+  letter-spacing: 0.08em;
+  line-height: 1.02;
+  color: var(--color-navy);
+}
+
+.focus-mobile__header em {
+  margin: 0;
+  font-style: normal;
+  color: #7E8E7A;
+  font-size: 0.95rem;
+}
+
+.focus-mobile__header span {
+  color: #5D0D18;
+  font-size: 0.9rem;
 }
 
 .focus-mobile__controls {
-  margin-top: 26px;
+  width: 100%;
   display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.focus-mobile__pill-select {
+  width: 100%;
+  border: 0;
+  background: #264E4A;
+  color: #F8F1E2;
+  border-radius: 999px;
+  height: 42px;
+  padding: 0 16px;
+  appearance: none;
+}
+
+.focus-mobile__start-zone {
+  margin-top: auto;
+  width: 100%;
+  display: grid;
+  justify-items: center;
   gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.focus-mobile__controls .select {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(27, 42, 74, 0.22);
-}
-
-.focus-mobile__idle {
-  margin-top: 130px;
-  text-align: center;
+  padding-bottom: 16px;
 }
 
 .focus-mobile__start-label {
   margin: 0;
-  font-size: 1.15rem;
+  color: var(--color-navy);
+  text-transform: lowercase;
 }
 
 .focus-mobile__start-bar {
-  margin-top: 8px;
-  width: min(82vw, 400px);
-  height: 16px;
-  border: 0;
-  background: var(--color-bloodstone);
-  border-radius: 999px;
-}
-
-.focus-mobile__resume-button,
-.focus-mobile__stop-fallback {
-  margin-top: 16px;
+  width: min(82%, 320px);
+  height: 3px;
   border: 0;
   border-radius: 999px;
-  padding: 8px 12px;
-  color: var(--color-vanilla);
-  background: var(--color-bloodstone);
+  background: #5D0D18;
 }
 
-.focus-mobile__running {
-  margin-top: 62px;
-  display: grid;
-  justify-items: center;
+.focus-mobile__start-zone--running {
   gap: 12px;
 }
 
-.focus-mobile__learning-label {
-  font-size: 1rem;
-  color: color-mix(in srgb, var(--color-sage) 62%, var(--color-navy) 38%);
-}
-
-.focus-mobile__rising-track {
-  width: 72px;
-  height: min(52vh, 420px);
-  background: rgba(27, 42, 74, 0.08);
-  border-radius: 14px;
+.focus-mobile__stop-track {
+  width: min(82%, 320px);
+  height: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(93, 13, 24, 0.2);
+  background: rgba(93, 13, 24, 0.06);
   position: relative;
   overflow: hidden;
-  display: flex;
-  align-items: flex-end;
 }
 
-.focus-mobile__rising-fill {
-  width: 100%;
-  background: var(--color-bloodstone);
-  border-radius: 14px 14px 0 0;
-  transition: height 600ms ease;
+.focus-mobile__stop-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #5D0D18;
+  transition: height 800ms ease;
 }
 
 .focus-mobile__drag-stop-handle {
   position: absolute;
   left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
-  border: 0;
-  background: var(--color-vanilla);
-  color: var(--color-bloodstone);
+  top: 8px;
+  width: 52px;
+  height: 16px;
   border-radius: 999px;
-  width: 32px;
-  height: 32px;
-  font-size: 0.95rem;
-  box-shadow: 0 2px 12px rgba(27, 42, 74, 0.22);
+  border: 0;
+  background: #FFF9EB;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
-.focus-mobile__running-footer {
-  width: min(78vw, 340px);
+.focus-mobile__session-meta {
+  width: min(82%, 320px);
   display: flex;
   justify-content: space-between;
-  color: var(--color-bloodstone);
+  font-size: 0.82rem;
+  color: #5D0D18;
+}
+
+.focus-mobile__resume-button {
+  margin-top: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: #264E4A;
+  color: #F8F1E2;
+  padding: 8px 14px;
+}
+
+.focus-mobile__drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(76vw, 280px);
+  background: #1B2A4A;
+  transform: translateX(-100%);
+  transition: transform 220ms ease;
+  z-index: 40;
+  padding: 32px 20px;
+}
+
+.focus-mobile__drawer.is-open {
+  transform: translateX(0);
+}
+
+.focus-mobile__drawer-nav {
+  display: grid;
+  gap: 16px;
+}
+
+.focus-mobile__drawer-item {
+  color: #FFF9EB;
   font-weight: 600;
 }
 
-.focus-mobile__meta {
-  margin-top: 24px;
-  display: grid;
-  gap: 4px;
-  font-size: 0.84rem;
-  color: color-mix(in srgb, var(--color-navy) 70%, var(--color-sage) 30%);
+.focus-mobile__drawer-overlay {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  z-index: 35;
+}
+
+.focus-mobile__drawer-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .focus-mobile__note-tab {
   position: fixed;
-  right: -22px;
-  top: 42%;
+  right: -24px;
+  top: 48%;
+  width: 94px;
+  height: 34px;
   border: 0;
-  width: 90px;
-  height: 36px;
   transform: rotate(-45deg);
-  transform-origin: center;
-  background: var(--color-chalk);
-  color: var(--color-navy);
+  background: #E8DDC6;
+  color: #1B2A4A;
   font-weight: 700;
-  z-index: 14;
+  z-index: 32;
 }
 
 .focus-mobile__note-tab.is-open {
-  background: var(--color-brandy);
-  color: #fff;
+  background: #CBB294;
 }
 
 .focus-mobile__note-panel {
   position: fixed;
   top: 0;
   right: 0;
-  width: min(86vw, 360px);
+  width: min(84vw, 340px);
   height: 100vh;
-  background: var(--color-vanilla);
-  border-left: 1px solid rgba(27, 42, 74, 0.18);
+  background: #FFF9EB;
+  border-left: 1px solid rgba(27, 42, 74, 0.2);
   transform: translateX(100%);
-  transition: transform 260ms ease;
-  z-index: 16;
+  transition: transform 240ms ease;
+  z-index: 36;
   padding: 24px 16px;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .focus-mobile__note-panel.is-open {
   transform: translateX(0);
 }
 
-.focus-mobile__note-panel label {
-  font-weight: 700;
-}
-
 .focus-mobile__note-panel textarea {
   width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(27, 42, 74, 0.26);
-  padding: 12px;
-  color: var(--color-navy);
-  background: var(--color-vanilla);
+  border: 1px solid rgba(27, 42, 74, 0.24);
+  border-radius: 10px;
+  background: #FFF9EB;
+  padding: 10px;
   resize: none;
 }
 
-@media (min-width: 960px) {
-  .focus-mobile__canvas {
-    max-width: 960px;
-    margin: 0 auto;
-    padding-inline: 40px;
+@media (min-width: 900px) {
+  .focus-mobile {
+    padding-inline: 16px;
   }
 
-  .focus-mobile__controls {
-    max-width: 380px;
+  .focus-mobile__canvas {
+    box-shadow: 0 0 0 1px rgba(170, 181, 158, 0.25);
   }
 }
