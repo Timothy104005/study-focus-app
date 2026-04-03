@@ -3,8 +3,6 @@
 import { StudyBarChart } from "@/components/charts/study-bar-chart";
 import { RecentSessions } from "@/components/shared/recent-sessions";
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/page-header";
-import { SectionCard } from "@/components/ui/section-card";
 import {
   AuthRequiredState,
   EmptyState,
@@ -14,24 +12,20 @@ import {
 } from "@/components/ui/state-panels";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { formatMinutes } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 
 const studyFocusApi = getStudyFocusApi();
 
 export function ProfilePage() {
-  const {
-    data,
-    errorMessage,
-    errorStatus,
-    isError,
-    isLoading,
-    reload,
-  } = useAsyncData(() => studyFocusApi.getProfile(), []);
+  const { t } = useI18n();
+  const { data, errorMessage, errorStatus, isError, isLoading, reload } =
+    useAsyncData(() => studyFocusApi.getProfile(), []);
 
   if (isLoading) {
     return (
       <div className="page">
-        <LoadingState label="正在整理你的讀書統計。" />
+        <LoadingState label={t("profile_loading")} />
       </div>
     );
   }
@@ -40,9 +34,9 @@ export function ProfilePage() {
     return (
       <div className="page">
         {errorStatus === 401 ? (
-          <AuthRequiredState description="登入後才能看到你的連續天數與讀書統計。" />
+          <AuthRequiredState description={t("profile_auth_desc")} />
         ) : (
-          <ErrorState description={errorMessage ?? "個人資料載入失敗。"} onRetry={reload} />
+          <ErrorState description={errorMessage ?? t("profile_loading")} onRetry={reload} />
         )}
       </div>
     );
@@ -51,120 +45,123 @@ export function ProfilePage() {
   if (!data) {
     return (
       <div className="page">
-        <EmptyState
-          title="還沒有統計資料"
-          description="完成幾次專注後，這裡就會開始整理你的讀書節奏。"
-        />
+        <EmptyState title={t("profile_empty_title")} description={t("profile_empty_desc")} />
       </div>
     );
   }
 
   return (
     <div className="page stack-lg">
-      <section className="profile-hero">
+
+      {/* Profile hero */}
+      <header className="profile-hero" style={{ paddingTop: 52 }}>
         <div className="profile-avatar" aria-hidden="true">
           {data.user.name.slice(0, 1)}
         </div>
-        <div className="stack-xs">
-          <h2 className="section-title">{data.user.name}</h2>
+        <div className="stack-xs" style={{ flex: 1 }}>
+          <h1 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, color: "var(--chalk)" }}>
+            {data.user.name}
+          </h1>
           <p className="meta-text">{data.user.className}</p>
+          <p className="meta-text" style={{ fontSize: "0.8rem", fontFamily: "var(--font-mono)" }}>
+            {data.user.email}
+          </p>
         </div>
         <div className="button-row">
-          <Link href="/focus" className="btn btn--primary btn--small">
-            開始專注
-          </Link>
-          <Link href="/leaderboard" className="btn btn--primary btn--small">
-            看排行榜
-          </Link>
+          <Link href="/focus" className="btn btn--primary btn--small">{t("profile_cta_focus")}</Link>
+          <Link href="/leaderboard" className="btn btn--secondary btn--small">{t("profile_cta_lb")}</Link>
         </div>
-      </section>
+      </header>
 
-      <PageHeader
-        eyebrow="個人統計"
-        title={`${data.user.name} 的讀書節奏`}
-        description={`${data.user.className} · ${data.user.email}`}
-      />
-
+      {/* Achievement banner */}
       <NoticeBanner tone={data.achievementFeedback.tone}>
         <strong>{data.achievementFeedback.title}</strong> {data.achievementFeedback.message}
       </NoticeBanner>
 
+      {/* Stat grid */}
       <div className="stats-grid">
         <article className="stat-card">
-          <span className="stat-label">連續天數</span>
-          <p className="stat-value">{data.streakDays} 天</p>
-          <span className="meta-text">每天都有碰到書，比爆衝更重要</span>
+          <span className="stat-label">{t("profile_stat_streak")}</span>
+          <p className="stat-value">{data.streakDays}{t("profile_stat_streak_unit")}</p>
+          <span className="meta-text">{t("profile_stat_streak_desc")}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">今日累積</span>
+          <span className="stat-label">{t("profile_stat_today")}</span>
           <p className="stat-value">{formatMinutes(data.todayMinutes)}</p>
           <span className="meta-text">{data.dailyGoal.statusText}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">本週累積</span>
+          <span className="stat-label">{t("profile_stat_weekly")}</span>
           <p className="stat-value">{formatMinutes(data.weeklyMinutes)}</p>
           <span className="meta-text">{data.weeklyTrend.summary}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">總讀書時間</span>
+          <span className="stat-label">{t("profile_stat_total")}</span>
           <p className="stat-value">{formatMinutes(data.totalStudyMinutes)}</p>
-          <span className="meta-text">每一次專注都會算進你的累積</span>
+          <span className="meta-text">{t("profile_stat_total_desc")}</span>
         </article>
       </div>
 
+      {/* Chart + Goal side by side */}
       <div className="split-grid split-grid--sidebar">
-        <SectionCard
-          title="近 7 天趨勢"
-          description="不需要每天都衝高，但希望整體慢慢往上。"
-        >
+        <section className="card">
+          <div className="section-header" style={{ marginBottom: 14 }}>
+            <div className="stack-xs">
+              <h2 className="section-title">{t("profile_chart_title")}</h2>
+              <p className="section-description">{t("profile_chart_desc")}</p>
+            </div>
+          </div>
           <StudyBarChart points={data.last7Days} />
-        </SectionCard>
+        </section>
 
-        <SectionCard
-          title="目標進度"
-          description="先看今天，再看整週，節奏會更清楚。"
-          muted
-        >
+        <section className="card card--muted">
+          <div className="section-header" style={{ marginBottom: 14 }}>
+            <div className="stack-xs">
+              <h2 className="section-title">{t("profile_goal_title")}</h2>
+              <p className="section-description">{t("profile_goal_desc")}</p>
+            </div>
+          </div>
           <div className="compact-stats">
             <div className="compact-stat">
-              <span className="stat-label">今日完成</span>
+              <span className="stat-label">{t("profile_goal_today")}</span>
               <p className="metric-value">
                 {formatMinutes(data.dailyGoal.currentMinutes)} / {formatMinutes(data.dailyGoal.targetMinutes)}
               </p>
             </div>
             <div className="compact-stat">
-              <span className="stat-label">本週完成</span>
+              <span className="stat-label">{t("profile_goal_weekly")}</span>
               <p className="metric-value">
                 {formatMinutes(data.weeklyGoal.currentMinutes)} / {formatMinutes(data.weeklyGoal.targetMinutes)}
               </p>
             </div>
             <div className="compact-stat">
-              <span className="stat-label">本週趨勢</span>
+              <span className="stat-label">{t("profile_goal_trend")}</span>
               <p className="metric-value">
                 {data.weeklyTrend.direction === "up"
-                  ? "向上"
+                  ? t("profile_trend_up")
                   : data.weeklyTrend.direction === "down"
-                    ? "補節奏中"
-                    : "持平"}
+                  ? t("profile_trend_down")
+                  : t("profile_trend_flat")}
               </p>
             </div>
             <div className="compact-stat">
-              <span className="stat-label">今天狀態</span>
+              <span className="stat-label">{t("profile_goal_status")}</span>
               <p className="metric-value">{data.dailyGoal.statusText}</p>
             </div>
           </div>
-        </SectionCard>
+        </section>
       </div>
 
-      <SectionCard
-        title="里程碑"
-        description="只保留最輕量的幾個徽章，提醒你現在累積到哪裡。"
-      >
+      {/* Badges */}
+      <section className="card">
+        <div className="section-header" style={{ marginBottom: 14 }}>
+          <div className="stack-xs">
+            <h2 className="section-title">{t("profile_badges_title")}</h2>
+            <p className="section-description">{t("profile_badges_desc")}</p>
+          </div>
+        </div>
         {data.badges.length === 0 ? (
-          <EmptyState
-            title="還沒有里程碑"
-            description="完成幾輪專注後，這裡會開始顯示穩定度與累積進度。"
-          />
+          <EmptyState title={t("profile_badges_empty_title")} description={t("profile_badges_empty_desc")} />
         ) : (
           <div className="section-grid section-grid--3">
             {data.badges.map((badge) => (
@@ -175,21 +172,25 @@ export function ProfilePage() {
             ))}
           </div>
         )}
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title="最近完成的專注"
-        description="回頭看科目與備註，比較容易找到自己最有效的節奏。"
-      >
+      {/* Recent sessions */}
+      <section className="card">
+        <div className="section-header" style={{ marginBottom: 14 }}>
+          <div className="stack-xs">
+            <h2 className="section-title">{t("profile_sessions_title")}</h2>
+            <p className="section-description">{t("profile_sessions_desc")}</p>
+          </div>
+        </div>
         {data.recentSessions.length === 0 ? (
           <EmptyState
-            title="還沒有最近紀錄"
-            description="先去完成一輪專注計時，這裡就會開始更新。"
+            title={t("profile_sessions_empty_title")}
+            description={t("profile_sessions_empty_desc")}
           />
         ) : (
           <RecentSessions sessions={data.recentSessions} />
         )}
-      </SectionCard>
+      </section>
     </div>
   );
 }

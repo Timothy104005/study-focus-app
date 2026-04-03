@@ -12,6 +12,7 @@ import {
 import type { StudySessionDto } from "@/contracts";
 import type { GroupSummary, SubjectTag } from "@/contracts/study-focus";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { useI18n } from "@/lib/i18n";
 import { localizeSubjectTags } from "@/lib/study-subjects";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 import { getStudyFocusApi } from "@/services/study-focus-api";
@@ -37,21 +38,15 @@ interface FocusPageData {
 
 function formatHHMMSS(totalSeconds: number) {
   const safeSeconds = Math.max(totalSeconds, 0);
-  const hours = Math.floor(safeSeconds / 3600)
-    .toString()
-    .padStart(2, "0");
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-    .toString()
-    .padStart(2, "0");
+  const hours = Math.floor(safeSeconds / 3600).toString().padStart(2, "0");
+  const minutes = Math.floor((safeSeconds % 3600) / 60).toString().padStart(2, "0");
   const seconds = (safeSeconds % 60).toString().padStart(2, "0");
   return `${hours}:${minutes}:${seconds}`;
 }
 
 function formatMMSS(totalSeconds: number) {
   const safeSeconds = Math.max(totalSeconds, 0);
-  const minutes = Math.floor(safeSeconds / 60)
-    .toString()
-    .padStart(2, "0");
+  const minutes = Math.floor(safeSeconds / 60).toString().padStart(2, "0");
   const seconds = (safeSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
 }
@@ -78,12 +73,12 @@ async function loadFocusPageData(): Promise<FocusPageData> {
 }
 
 const focusDrawerItems = [
-  { href: "/focus", label: "Focus" },
-  { href: "/groups", label: "Group" },
-  { href: "/exams", label: "Plan" },
-  { href: "/leaderboard", label: "Record" },
-  { href: "/profile", label: "Mine" },
-] as const;
+  { href: "/focus", labelKey: "nav_focus" as const },
+  { href: "/groups", labelKey: "nav_groups" as const },
+  { href: "/exams", labelKey: "nav_plan" as const },
+  { href: "/leaderboard", labelKey: "nav_record" as const },
+  { href: "/profile", labelKey: "nav_profile" as const },
+];
 
 function FocusCanvasShell({
   children,
@@ -104,6 +99,8 @@ function FocusCanvasShell({
   notesDraft: string;
   onNotesChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="focus-mobile">
       <section className="focus-mobile__canvas">
@@ -126,7 +123,7 @@ function FocusCanvasShell({
         <nav className="focus-mobile__drawer-nav" aria-label="Focus 導覽">
           {focusDrawerItems.map((item) => (
             <Link key={item.href} href={item.href} className="focus-mobile__drawer-item" onClick={onSidebarClose}>
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           ))}
         </nav>
@@ -143,16 +140,16 @@ function FocusCanvasShell({
         className={`focus-mobile__note-tab ${isNoteOpen ? "is-open" : ""}`}
         onClick={onNoteToggle}
       >
-        Note
+        {t("common_notes_label")}
       </button>
 
       <aside className={`focus-mobile__note-panel ${isNoteOpen ? "is-open" : ""}`}>
-        <label htmlFor="focus-note-textarea">筆記 Note</label>
+        <label htmlFor="focus-note-textarea">{t("focus_notes")}</label>
         <textarea
           id="focus-note-textarea"
           value={notesDraft}
           onChange={(event) => onNotesChange(event.target.value)}
-          placeholder="記錄現在的想法..."
+          placeholder={t("focus_notes_hint")}
         />
       </aside>
     </div>
@@ -160,19 +157,16 @@ function FocusCanvasShell({
 }
 
 export function FocusPage() {
+  const { t } = useI18n();
   const { data, errorMessage, errorStatus, isError, isLoading, reload, setData } =
     useAsyncData(loadFocusPageData, []);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [selectedGroupId, setSelectedGroupId] = useState("");
+  // Multi-select: array of groupIds
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<StudySessionDto | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [pendingAction, setPendingAction] = useState<"start" | "pause" | "stop" | null>(
-    null,
-  );
-  const [notice, setNotice] = useState<{
-    tone: "error" | "success";
-    text: string;
-  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<"start" | "pause" | "stop" | null>(null);
+  const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
@@ -182,33 +176,28 @@ export function FocusPage() {
   const isInterruptingFromTabBlurRef = useRef(false);
 
   useEffect(() => {
-    if (!data) {
-      return;
-    }
+    if (!data) return;
 
-    setSelectedGroupId((current) => current || data.openSession?.groupId || data.groups[0]?.id || "");
+    // Pre-select the group from the open session, or all groups if none
+    setSelectedGroupIds((current) => {
+      if (current.length > 0) return current;
+      if (data.openSession?.groupId) return [data.openSession.groupId];
+      return data.groups.map((g) => g.id);
+    });
     setSelectedSubjectId((current) => current || data.subjects[0]?.id || "");
     setActiveSession(data.openSession);
   }, [data]);
 
   useEffect(() => {
-    if (!activeSession) {
-      setElapsedSeconds(0);
-      return;
-    }
-
+    if (!activeSession) { setElapsedSeconds(0); return; }
     setElapsedSeconds(activeSession.effectiveDurationSeconds);
-
-    if (activeSession.status !== "active") {
-      return;
-    }
+    if (activeSession.status !== "active") return;
 
     const baseline = activeSession.effectiveDurationSeconds;
     const startedAt = Date.now();
     const timer = window.setInterval(() => {
       setElapsedSeconds(baseline + Math.floor((Date.now() - startedAt) / 1000));
     }, 1000);
-
     return () => window.clearInterval(timer);
   }, [activeSession]);
 
@@ -219,39 +208,25 @@ export function FocusPage() {
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState !== "hidden") {
-        return;
-      }
-      if (isInterruptingFromTabBlurRef.current) {
-        return;
-      }
+      if (document.visibilityState !== "hidden") return;
+      if (isInterruptingFromTabBlurRef.current) return;
 
       isInterruptingFromTabBlurRef.current = true;
       void studyFocusV1Api
         .interruptStudySession(activeSession.id, "tab_blur")
         .then((interruptedSession) => {
           setActiveSession(interruptedSession);
-          setNotice({
-            tone: "error",
-            text: "偵測到切換分頁，已中斷本輪專注，請回到頁面後重新開始。",
-          });
+          setNotice({ tone: "error", text: t("focus_interrupted") });
         })
         .catch((reason) => {
-          setNotice({
-            tone: "error",
-            text: getReadableErrorMessage(reason, "切換分頁時中斷專注失敗。"),
-          });
+          setNotice({ tone: "error", text: getReadableErrorMessage(reason, t("focus_interrupted")) });
         })
-        .finally(() => {
-          isInterruptingFromTabBlurRef.current = false;
-        });
+        .finally(() => { isInterruptingFromTabBlurRef.current = false; });
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [activeSession]);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [activeSession, t]);
 
   const secondsRemaining = activeSession
     ? Math.max(SESSION_SECONDS - elapsedSeconds, 0)
@@ -261,6 +236,15 @@ export function FocusPage() {
   const dailyTotalDisplaySeconds = dailyTotalBaseSeconds + runningSessionSeconds;
   const barProgress = Math.min(elapsedSeconds / SESSION_SECONDS, 1);
 
+  function toggleGroup(groupId: string) {
+    if (Boolean(activeSession)) return;
+    setSelectedGroupIds((current) =>
+      current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId],
+    );
+  }
+
   async function handleStartOrResume() {
     setNotice(null);
     setPendingAction("start");
@@ -269,25 +253,26 @@ export function FocusPage() {
       if (activeSession && activeSession.status === "paused") {
         const resumed = await studyFocusV1Api.resumeStudySession(activeSession.id);
         setActiveSession(resumed);
-        setNotice({ tone: "success", text: "已繼續本輪專注。" });
+        setNotice({ tone: "success", text: t("focus_resume_success") });
         return;
       }
 
-      if (!selectedGroupId || !selectedSubjectId) {
-        setNotice({ tone: "error", text: "請先選擇科目與小組。" });
+      if (!selectedGroupIds.length || !selectedSubjectId) {
+        setNotice({ tone: "error", text: t("focus_select_required") });
         return;
       }
 
+      // Use first selected group for the session (API accepts one groupId)
       const created = await studyFocusV1Api.createStudySession({
-        groupId: selectedGroupId,
+        groupId: selectedGroupIds[0],
         title: selectedSubjectId,
         notes: null,
       });
       setActiveSession(created);
       setData((current) => (current ? { ...current, openSession: created } : current));
-      setNotice({ tone: "success", text: "專注計時已開始，保持節奏！" });
+      setNotice({ tone: "success", text: t("focus_start_success") });
     } catch (reason) {
-      setNotice({ tone: "error", text: getReadableErrorMessage(reason, "開始專注失敗。") });
+      setNotice({ tone: "error", text: getReadableErrorMessage(reason, t("focus_select_required")) });
     } finally {
       setPendingAction(null);
     }
@@ -295,7 +280,6 @@ export function FocusPage() {
 
   async function handleStop() {
     if (!activeSession) return;
-
     setNotice(null);
     setPendingAction("stop");
     try {
@@ -317,9 +301,9 @@ export function FocusPage() {
       );
       setDragOffset(0);
       setIsDraggingStop(false);
-      setNotice({ tone: "success", text: "本輪已結束並完成紀錄。" });
+      setNotice({ tone: "success", text: t("focus_stop_success") });
     } catch (reason) {
-      setNotice({ tone: "error", text: getReadableErrorMessage(reason, "停止失敗。") });
+      setNotice({ tone: "error", text: getReadableErrorMessage(reason, t("focus_stop_success")) });
     } finally {
       setPendingAction(null);
     }
@@ -329,33 +313,24 @@ export function FocusPage() {
   const hasGroups = (data?.groups.length ?? 0) > 0;
 
   function handleStopDragStart(clientY: number) {
-    if (!canShowRunningLayout || pendingAction !== null) {
-      return;
-    }
+    if (!canShowRunningLayout || pendingAction !== null) return;
     dragStartYRef.current = clientY;
     setIsDraggingStop(true);
   }
 
   function handleStopDragMove(clientY: number) {
-    if (!isDraggingStop || dragStartYRef.current === null) {
-      return;
-    }
+    if (!isDraggingStop || dragStartYRef.current === null) return;
     const offset = Math.max(clientY - dragStartYRef.current, 0);
     setDragOffset(offset);
   }
 
   function handleStopDragEnd() {
-    if (!isDraggingStop) {
-      return;
-    }
+    if (!isDraggingStop) return;
     const reachedThreshold = dragOffset >= STOP_DRAG_THRESHOLD_PX;
     setIsDraggingStop(false);
     setDragOffset(0);
     dragStartYRef.current = null;
-
-    if (reachedThreshold) {
-      void handleStop();
-    }
+    if (reachedThreshold) void handleStop();
   }
 
   return (
@@ -372,15 +347,15 @@ export function FocusPage() {
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
         <header className="focus-mobile__header">
-          <p>Learning time</p>
+          <p>{t("focus_learning_time")}</p>
           <strong>{formatHHMMSS(dailyTotalDisplaySeconds)}</strong>
-          <em>Be confident</em>
+          <em>{t("focus_be_confident")}</em>
           {canShowRunningLayout ? <span>{formatMMSS(elapsedSeconds)}</span> : null}
         </header>
 
         <div className="focus-mobile__controls">
           <label htmlFor="focus-subject" className="sr-only">
-            科目
+            {t("focus_subject_label")}
           </label>
           <select
             id="focus-subject"
@@ -395,45 +370,70 @@ export function FocusPage() {
               </option>
             ))}
           </select>
-          <label htmlFor="focus-group" className="sr-only">
-            小組
-          </label>
-          <select
-            id="focus-group"
-            className="focus-mobile__pill-select"
-            value={selectedGroupId}
-            onChange={(event) => setSelectedGroupId(event.target.value)}
-            disabled={Boolean(activeSession) || !hasGroups}
-          >
-            {data?.groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
+
+          {/* Multi-select group chips */}
+          {data && data.groups.length > 0 ? (
+            <div>
+              <p style={{
+                margin: "0 0 6px",
+                fontSize: "0.76rem",
+                fontFamily: "var(--font-mono)",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--text-faint)",
+              }}>
+                {t("focus_groups_label")}
+                {selectedGroupIds.length > 0 && (
+                  <span style={{ color: "var(--cyan-300)", marginLeft: 8 }}>
+                    {selectedGroupIds.length} {t("focus_groups_selected")}
+                    {t("focus_groups_unit")}
+                  </span>
+                )}
+              </p>
+              <div className="focus-mobile__group-chips">
+                {data.groups.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    className={`focus-mobile__group-chip${selectedGroupIds.includes(group.id) ? " focus-mobile__group-chip--selected" : ""}`}
+                    onClick={() => toggleGroup(group.id)}
+                    disabled={Boolean(activeSession) || !data}
+                    aria-pressed={selectedGroupIds.includes(group.id)}
+                  >
+                    {selectedGroupIds.includes(group.id) && (
+                      <span aria-hidden style={{ fontSize: "0.7rem" }}>✓</span>
+                    )}
+                    {group.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {!hasGroups && data ? (
           <NoticeBanner tone="error">
-            目前尚未加入任何小組，請先前往 <Link href="/groups">小組頁面</Link> 建立或加入小組後再開始專注。
+            {t("focus_no_groups")} <Link href="/groups">{t("focus_no_groups_link")}</Link>{" "}
+            {t("focus_no_groups_suffix")}
           </NoticeBanner>
         ) : null}
 
-        {isLoading ? <LoadingState label="正在載入專注頁面..." /> : null}
+        {isLoading ? <LoadingState label={t("focus_loading")} /> : null}
         {isError ? (
           errorStatus === 401 ? (
-            <AuthRequiredState description="請先登入才能開始專注計時。" />
+            <AuthRequiredState description={t("focus_auth_desc")} />
           ) : (
-            <ErrorState description={errorMessage ?? "專注頁載入失敗。"} onRetry={reload} />
+            <ErrorState description={errorMessage ?? t("focus_loading")} onRetry={reload} />
           )
         ) : null}
         {!isLoading && !isError && !data ? (
-          <EmptyState title="目前沒有專注資料" description="請稍後再試一次。" />
+          <EmptyState title={t("focus_empty_title")} description={t("focus_empty_desc")} />
         ) : null}
 
         {!canShowRunningLayout ? (
           <div className="focus-mobile__start-zone">
-            <p className="focus-mobile__start-label">start</p>
+            <p className="focus-mobile__start-label">{t("focus_start")}</p>
             {hasGroups ? (
               <button
                 type="button"
@@ -450,13 +450,13 @@ export function FocusPage() {
                 onClick={() => void handleStartOrResume()}
                 disabled={pendingAction !== null}
               >
-                繼續暫停中的專注
+                {t("focus_resume")}
               </button>
             ) : null}
           </div>
         ) : (
           <div className="focus-mobile__start-zone focus-mobile__start-zone--running">
-            <p className="focus-mobile__start-label">start</p>
+            <p className="focus-mobile__start-label">{t("focus_start")}</p>
             <div
               className="focus-mobile__stop-track"
               onPointerMove={(event) => handleStopDragMove(event.clientY)}
@@ -482,8 +482,8 @@ export function FocusPage() {
               />
             </div>
             <div className="focus-mobile__session-meta">
-              <span>Session {formatMMSS(elapsedSeconds)}</span>
-              <span>剩餘 {formatMMSS(secondsRemaining)}</span>
+              <span>{t("focus_session")} {formatMMSS(elapsedSeconds)}</span>
+              <span>{t("focus_remaining")} {formatMMSS(secondsRemaining)}</span>
             </div>
           </div>
         )}

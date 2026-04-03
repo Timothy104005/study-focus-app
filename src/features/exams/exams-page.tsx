@@ -4,8 +4,6 @@ import type { Exam } from "@/contracts/study-focus";
 import { FormEvent, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { SectionCard } from "@/components/ui/section-card";
 import {
   AuthRequiredState,
   EmptyState,
@@ -15,79 +13,48 @@ import {
 } from "@/components/ui/state-panels";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { calculateCountdownDays, formatDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 
 const studyFocusApi = getStudyFocusApi();
 
-function resolveExamTypeLabel(type: string) {
-  if (type === "official") {
-    return "班級考試";
-  }
-
-  if (type === "mock") {
-    return "模擬考";
-  }
-
-  return "自訂";
-}
-
 export function ExamsPage() {
-  const {
-    data,
-    errorMessage,
-    errorStatus,
-    isError,
-    isLoading,
-    reload,
-    setData,
-  } = useAsyncData(() => studyFocusApi.getExams(), []);
+  const { t } = useI18n();
+  const { data, errorMessage, errorStatus, isError, isLoading, reload, setData } =
+    useAsyncData(() => studyFocusApi.getExams(), []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
-  const [form, setForm] = useState({
-    date: "",
-    subjectScope: "",
-    title: "",
-  });
-  const [notice, setNotice] = useState<{
-    text: string;
-    tone: "error" | "success";
-  } | null>(null);
+  const [form, setForm] = useState({ date: "", subjectScope: "", title: "" });
+  const [notice, setNotice] = useState<{ text: string; tone: "error" | "success" } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingExamId, setDeletingExamId] = useState<string | null>(null);
 
   const sortedExams = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-
-    return [...data].sort(
-      (left, right) =>
-        new Date(left.date).getTime() - new Date(right.date).getTime(),
-    );
+    if (!data) return [];
+    return [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [data]);
+
   const nextUpcomingExam = useMemo(
-    () => sortedExams.find((exam) => calculateCountdownDays(exam.date) >= 0) ?? null,
+    () => sortedExams.find((e) => calculateCountdownDays(e.date) >= 0) ?? null,
     [sortedExams],
   );
 
+  function resolveExamTypeLabel(type: string) {
+    if (type === "official") return t("exams_type_official");
+    if (type === "mock") return t("exams_type_mock");
+    return t("exams_type_custom");
+  }
+
   function openCreateModal() {
     setEditingExam(null);
-    setForm({
-      date: "",
-      subjectScope: "",
-      title: "",
-    });
+    setForm({ date: "", subjectScope: "", title: "" });
     setIsModalOpen(true);
   }
 
   function openEditModal(exam: Exam) {
     setEditingExam(exam);
-    setForm({
-      date: exam.date,
-      subjectScope: exam.subjectScope,
-      title: exam.title,
-    });
+    setForm({ date: exam.date, subjectScope: exam.subjectScope, title: exam.title });
     setIsModalOpen(true);
   }
 
@@ -95,76 +62,46 @@ export function ExamsPage() {
     event.preventDefault();
     setIsSubmitting(true);
     setNotice(null);
-
     try {
       if (editingExam) {
-        const updatedExam = await studyFocusApi.updateExam(editingExam.id, {
+        const updated = await studyFocusApi.updateExam(editingExam.id, {
           date: form.date,
           subjectScope: form.subjectScope.trim(),
           title: form.title.trim(),
         });
-        setData((current) =>
-          current
-            ? current.map((exam) =>
-                exam.id === updatedExam.id ? updatedExam : exam,
-              )
-            : current,
-        );
-        setNotice({
-          text: `已更新「${updatedExam.title}」的倒數。`,
-          tone: "success",
-        });
+        setData((current) => current ? current.map((e) => (e.id === updated.id ? updated : e)) : current);
+        setNotice({ text: `「${updated.title}」 updated.`, tone: "success" });
       } else {
-        const nextExam = await studyFocusApi.createExam({
+        const next = await studyFocusApi.createExam({
           date: form.date,
           subjectScope: form.subjectScope.trim(),
           title: form.title.trim(),
         });
-        setData((current) => (current ? [nextExam, ...current] : [nextExam]));
-        setNotice({
-          text: "自訂考試已加入倒數清單。",
-          tone: "success",
-        });
+        setData((current) => (current ? [next, ...current] : [next]));
+        setNotice({ text: "Exam added to countdown.", tone: "success" });
       }
-
       setForm({ date: "", subjectScope: "", title: "" });
       setIsModalOpen(false);
       setEditingExam(null);
       reload();
     } catch (reason) {
-      setNotice({
-        text: getReadableErrorMessage(reason, "考試資料儲存失敗。"),
-        tone: "error",
-      });
+      setNotice({ text: getReadableErrorMessage(reason, "Failed to save exam."), tone: "error" });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleDeleteExam(exam: Exam) {
-    const confirmed = window.confirm(`要刪除「${exam.title}」嗎？`);
-
-    if (!confirmed) {
-      return;
-    }
-
+    const confirmed = window.confirm(`Delete「${exam.title}」?`);
+    if (!confirmed) return;
     setDeletingExamId(exam.id);
     setNotice(null);
-
     try {
       await studyFocusApi.deleteExam(exam.id);
-      setData((current) =>
-        current ? current.filter((item) => item.id !== exam.id) : current,
-      );
-      setNotice({
-        text: `已刪除「${exam.title}」。`,
-        tone: "success",
-      });
+      setData((current) => current ? current.filter((e) => e.id !== exam.id) : current);
+      setNotice({ text: `「${exam.title}」 deleted.`, tone: "success" });
     } catch (reason) {
-      setNotice({
-        text: getReadableErrorMessage(reason, "刪除考試失敗。"),
-        tone: "error",
-      });
+      setNotice({ text: getReadableErrorMessage(reason, "Failed to delete."), tone: "error" });
     } finally {
       setDeletingExamId(null);
     }
@@ -173,7 +110,7 @@ export function ExamsPage() {
   if (isLoading) {
     return (
       <div className="page">
-        <LoadingState label="正在整理考試倒數。" />
+        <LoadingState label={t("exams_loading")} />
       </div>
     );
   }
@@ -182,9 +119,9 @@ export function ExamsPage() {
     return (
       <div className="page">
         {errorStatus === 401 ? (
-          <AuthRequiredState description="登入後才能查看與管理你的考試倒數。" />
+          <AuthRequiredState description={t("exams_auth_desc")} />
         ) : (
-          <ErrorState description={errorMessage ?? "考試資料載入失敗。"} onRetry={reload} />
+          <ErrorState description={errorMessage ?? t("exams_loading")} onRetry={reload} />
         )}
       </div>
     );
@@ -192,90 +129,96 @@ export function ExamsPage() {
 
   return (
     <div className="page stack-lg">
-      <PageHeader
-        eyebrow="考試倒數"
-        title="知道還剩幾天，讀書方向會更清楚。"
-        description="把重要考試列進來，先看最近的，再決定這週要先補哪一科。"
-        actions={<Button onClick={openCreateModal}>新增自訂考試</Button>}
-      />
+
+      {/* Header */}
+      <header style={{ paddingTop: 52, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div className="stack-xs">
+          <p className="eyebrow">{t("exams_eyebrow")}</p>
+          <h1 className="page-title">{t("exams_title")}</h1>
+          <p className="page-description">{t("exams_desc")}</p>
+        </div>
+        <div style={{ paddingTop: 32 }}>
+          <Button onClick={openCreateModal}>{t("exams_add_btn")}</Button>
+        </div>
+      </header>
 
       {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
+      {/* Next exam highlight */}
       {nextUpcomingExam ? (
-        <SectionCard
-          title="最近提醒"
-          description="用最近的一場考試幫自己把這幾天的優先順序排清楚。"
-          muted
-        >
+        <section className="dashboard-goal-card">
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div className="stack-xs">
+              <h2 className="section-title">{t("exams_next_title")}</h2>
+              <p className="meta-text">{t("exams_next_desc")}</p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p className="dashboard-goal-card__minutes">
+                {calculateCountdownDays(nextUpcomingExam.date)}{t("exams_days")}
+              </p>
+              <p className="meta-text">{nextUpcomingExam.title}</p>
+            </div>
+          </div>
           <div className="compact-stats">
             <div className="compact-stat">
-              <span className="stat-label">最近考試</span>
+              <span className="stat-label">{t("exams_next_exam")}</span>
               <p className="metric-value">{nextUpcomingExam.title}</p>
             </div>
             <div className="compact-stat">
-              <span className="stat-label">剩餘時間</span>
-              <p className="metric-value">{calculateCountdownDays(nextUpcomingExam.date)} 天</p>
+              <span className="stat-label">{t("exams_remaining")}</span>
+              <p className="metric-value">{calculateCountdownDays(nextUpcomingExam.date)} {t("exams_days")}</p>
             </div>
-            <div className="compact-stat">
-              <span className="stat-label">建議節奏</span>
+            <div className="compact-stat" style={{ gridColumn: "1 / -1" }}>
+              <span className="stat-label">{t("exams_suggestion")}</span>
               <p className="metric-value">
                 {calculateCountdownDays(nextUpcomingExam.date) <= 7
-                  ? "今天至少再補一輪"
+                  ? t("exams_hint_7")
                   : calculateCountdownDays(nextUpcomingExam.date) <= 21
-                    ? "先把每天節奏守住"
-                    : "這週先穩定累積"}
+                  ? t("exams_hint_21")
+                  : t("exams_hint_far")}
               </p>
             </div>
           </div>
-        </SectionCard>
+        </section>
       ) : null}
 
+      {/* Exam grid */}
       {!sortedExams.length ? (
         <EmptyState
-          title="還沒有考試資料"
-          description="先新增最近的一場考試，倒數才會開始運作。"
-          action={<Button onClick={openCreateModal}>新增第一場考試</Button>}
+          title={t("exams_empty_title")}
+          description={t("exams_empty_desc")}
+          action={<Button onClick={openCreateModal}>{t("exams_empty_btn")}</Button>}
         />
       ) : (
-        <SectionCard
-          title="主要考試"
-          description="自訂考試可直接編輯；班級共用考試目前先提供唯讀查看。"
-        >
+        <section className="card">
+          <div className="section-header" style={{ marginBottom: 16 }}>
+            <div className="stack-xs">
+              <h2 className="section-title">{t("exams_main_title")}</h2>
+              <p className="section-description">{t("exams_main_desc")}</p>
+            </div>
+          </div>
           <div className="section-grid section-grid--3">
             {sortedExams.map((exam) => {
               const countdownDays = calculateCountdownDays(exam.date);
               const isEditable = exam.type === "custom";
-
               return (
                 <article key={exam.id} className="exam-card">
                   <div className="card-header-row">
                     <span className="subject-pill">{resolveExamTypeLabel(exam.type)}</span>
                     <span className="meta-text">{exam.subjectScope}</span>
                   </div>
-
-                  <div className="stack-sm">
+                  <div className="stack-xs">
                     <strong>{exam.title}</strong>
-                    <span
-                      className={
-                        countdownDays < 0
-                          ? "exam-countdown exam-countdown--past"
-                          : "exam-countdown"
-                      }
-                    >
-                      {countdownDays < 0 ? "已結束" : `${countdownDays} 天`}
+                    <span className={countdownDays < 0 ? "exam-countdown exam-countdown--past" : "exam-countdown"}>
+                      {countdownDays < 0 ? t("exams_past") : `${countdownDays}${t("exams_days")}`}
                     </span>
                     <span className="meta-text">{formatDate(exam.date)}</span>
                   </div>
-
                   <div className="button-row">
                     {isEditable ? (
                       <>
-                        <Button
-                          variant="secondary"
-                          size="small"
-                          onClick={() => openEditModal(exam)}
-                        >
-                          編輯
+                        <Button variant="secondary" size="small" onClick={() => openEditModal(exam)}>
+                          {t("exams_edit_btn")}
                         </Button>
                         <Button
                           variant="ghost"
@@ -283,86 +226,65 @@ export function ExamsPage() {
                           onClick={() => void handleDeleteExam(exam)}
                           disabled={deletingExamId === exam.id}
                         >
-                          {deletingExamId === exam.id ? "刪除中..." : "刪除"}
+                          {deletingExamId === exam.id ? t("exams_deleting") : t("exams_delete_btn")}
                         </Button>
                       </>
                     ) : (
-                      <span className="meta-text">班級共用考試目前為唯讀</span>
+                      <span className="meta-text">{t("exams_readonly")}</span>
                     )}
                   </div>
                 </article>
               );
             })}
           </div>
-        </SectionCard>
+        </section>
       )}
 
+      {/* Modal */}
       <Modal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingExam ? "編輯自訂考試" : "新增自訂考試"}
-        description="適合模擬考、小考、讀書會測驗或自己設定的提醒節點。"
+        title={editingExam ? t("exams_edit_title") : t("exams_create_title")}
+        description={t("exams_modal_desc")}
       >
         <form className="field-grid" onSubmit={handleSubmitExam}>
           <div className="stack-xs">
-            <label className="field-label" htmlFor="exam-title">
-              考試名稱
-            </label>
+            <label className="field-label" htmlFor="exam-title">{t("exams_title_label")}</label>
             <input
               id="exam-title"
               className="input"
               value={form.title}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, title: event.target.value }))
-              }
-              placeholder="例如：數學模擬考"
+              onChange={(e) => setForm((c) => ({ ...c, title: e.target.value }))}
+              placeholder={t("exams_title_hint")}
               required
             />
           </div>
-
           <div className="stack-xs">
-            <label className="field-label" htmlFor="exam-date">
-              日期
-            </label>
+            <label className="field-label" htmlFor="exam-date">{t("exams_date_label")}</label>
             <input
               id="exam-date"
               type="date"
               className="input"
               value={form.date}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, date: event.target.value }))
-              }
+              onChange={(e) => setForm((c) => ({ ...c, date: e.target.value }))}
               required
             />
           </div>
-
           <div className="stack-xs">
-            <label className="field-label" htmlFor="exam-scope">
-              科目 / 範圍
-            </label>
+            <label className="field-label" htmlFor="exam-scope">{t("exams_scope_label")}</label>
             <input
               id="exam-scope"
               className="input"
               value={form.subjectScope}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  subjectScope: event.target.value,
-                }))
-              }
-              placeholder="例如：英文閱讀、數學全冊"
+              onChange={(e) => setForm((c) => ({ ...c, subjectScope: e.target.value }))}
+              placeholder={t("exams_scope_hint")}
               required
             />
           </div>
-
           <Button type="submit" disabled={isSubmitting} fullWidth>
             {isSubmitting
-              ? editingExam
-                ? "更新中..."
-                : "新增中..."
-              : editingExam
-                ? "更新考試"
-                : "加入倒數"}
+              ? editingExam ? t("exams_submitting_edit") : t("exams_submitting_create")
+              : editingExam ? t("exams_submit_edit") : t("exams_submit_create")}
           </Button>
         </form>
       </Modal>

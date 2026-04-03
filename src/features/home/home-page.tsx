@@ -8,29 +8,23 @@ import {
   LoadingState,
   NoticeBanner,
 } from "@/components/ui/state-panels";
-import { PageHeader } from "@/components/ui/page-header";
-import { SectionCard } from "@/components/ui/section-card";
 import { getButtonClassName } from "@/components/ui/button";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { calculateCountdownDays, formatDateTime, formatMinutes } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 
 const studyFocusApi = getStudyFocusApi();
 
 export function HomePage() {
-  const {
-    data,
-    errorMessage,
-    errorStatus,
-    isError,
-    isLoading,
-    reload,
-  } = useAsyncData(() => studyFocusApi.getDashboard(), []);
+  const { t } = useI18n();
+  const { data, errorMessage, errorStatus, isError, isLoading, reload } =
+    useAsyncData(() => studyFocusApi.getDashboard(), []);
 
   if (isLoading) {
     return (
       <div className="page">
-        <LoadingState label="正在整理你的今日專注與班級動態。" />
+        <LoadingState label={t("home_loading")} />
       </div>
     );
   }
@@ -39,9 +33,9 @@ export function HomePage() {
     return (
       <div className="page">
         {errorStatus === 401 ? (
-          <AuthRequiredState description="登入後才能看到首頁摘要、排行榜與小組動態。" />
+          <AuthRequiredState description={t("home_loading")} />
         ) : (
-          <ErrorState description={errorMessage ?? "首頁資料載入失敗。"} onRetry={reload} />
+          <ErrorState description={errorMessage ?? t("home_loading")} onRetry={reload} />
         )}
       </div>
     );
@@ -50,198 +44,160 @@ export function HomePage() {
   if (!data) {
     return (
       <div className="page">
-        <EmptyState
-          title="還沒有首頁摘要"
-          description="完成第一場專注後，這裡就會開始整理你的今日進度。"
-        />
+        <EmptyState title={t("home_empty_title")} description={t("home_empty_desc")} />
       </div>
     );
   }
 
-  const currentUserRank = data.leaderboardPreview.find(
-    (entry) => entry.isCurrentUser,
-  )?.rank;
-  const nextExamDays = data.nextExam
-    ? calculateCountdownDays(data.nextExam.date)
-    : null;
+  const currentUserRank = data.leaderboardPreview.find((e) => e.isCurrentUser)?.rank;
+  const nextExamDays = data.nextExam ? calculateCountdownDays(data.nextExam.date) : null;
   const leadingHighlight = data.classHighlights[0];
 
   return (
     <div className="page stack-lg dashboard-page">
-      <PageHeader
-        eyebrow="今日總覽"
-        title="今天先讀穩，名次就會慢慢往前。"
-        description="用最少的干擾掌握專注時數、班級節奏、小組狀態和最近的考試壓力。"
-      />
 
-      <section className="dashboard-goal-card">
-        <div className="stack-xs">
-          <h2 className="section-title">今天的目標</h2>
-          <p className="meta-text">先完成今天該讀的分鐘數，再看延伸練習。</p>
-        </div>
-        <p className="dashboard-goal-card__minutes">{formatMinutes(data.todayMinutes)}</p>
-      </section>
+      {/* ── Top bar ── */}
+      <header style={{ paddingTop: 52, display: "grid", gap: 6 }}>
+        <p className="eyebrow">{t("home_eyebrow")}</p>
+        <h1 className="page-title">{t("home_title")}</h1>
+        <p className="page-description">{t("home_desc")}</p>
+      </header>
 
+      {/* ── Achievement banner ── */}
       <NoticeBanner tone={data.achievementFeedback.tone}>
         <strong>{data.achievementFeedback.title}</strong> {data.achievementFeedback.message}
       </NoticeBanner>
 
-      <hr className="page-divider" />
-
-      <section className="hero-card home-hero">
-        <div className="stack-md">
-          <div className="hero-meta">
-            <span className="hero-badge">今日 {formatMinutes(data.todayMinutes)}</span>
-            <span className="hero-badge">連續 {data.streakDays} 天</span>
-            <span className="hero-badge">{data.dailyGoal.statusText}</span>
-            {currentUserRank ? (
-              <span className="hero-badge">班排第 {currentUserRank} 名</span>
-            ) : null}
-            {data.currentlyStudyingCount > 0 ? (
-              <span className="hero-badge">{data.currentlyStudyingCount} 人正在讀</span>
-            ) : null}
-          </div>
-
-          <div className="stack-sm">
-            <h2 className="home-hero__title">
-              把今天該讀的先完成，穩定比爆衝更有用。
-            </h2>
-            <p className="page-description">
-              進入專注頁開始計時，或直接去看排行榜和小組動態，讓節奏接上。
-            </p>
-          </div>
-        </div>
-
-        <div className="button-row">
-          <Link href="/focus" className={getButtonClassName("primary")}>
-            開始專注
-          </Link>
-          <Link href="/leaderboard" className={getButtonClassName("secondary")}>
-            查看排行榜
-          </Link>
-        </div>
-      </section>
-
-      <hr className="page-divider" />
-
+      {/* ── Quick stats strip ── */}
       <div className="stats-grid">
         <article className="stat-card">
-          <span className="stat-label">今日累積</span>
+          <span className="stat-label">{t("home_stat_today")}</span>
           <p className="stat-value">{formatMinutes(data.todayMinutes)}</p>
-          <span className="meta-text">每一段穩定專注都會算進來</span>
+          <span className="meta-text">{t("home_stat_today_desc")}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">今日目標</span>
+          <span className="stat-label">{t("home_stat_goal")}</span>
           <p className="stat-value">
             {formatMinutes(data.dailyGoal.currentMinutes)} / {formatMinutes(data.dailyGoal.targetMinutes)}
           </p>
           <span className="meta-text">{data.dailyGoal.statusText}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">本週趨勢</span>
+          <span className="stat-label">{t("home_stat_weekly")}</span>
           <p className="stat-value">
             {data.weeklyTrend.direction === "up"
-              ? "向上"
+              ? t("home_trend_up")
               : data.weeklyTrend.direction === "down"
-                ? "補節奏中"
-                : "持平"}
+              ? t("home_trend_down")
+              : t("home_trend_flat")}
           </p>
           <span className="meta-text">{data.weeklyTrend.summary}</span>
         </article>
         <article className="stat-card">
-          <span className="stat-label">下一場考試</span>
+          <span className="stat-label">{t("home_stat_next_exam")}</span>
           <p className="stat-value">
-            {nextExamDays === null ? "未設定" : `${nextExamDays} 天`}
+            {nextExamDays === null ? t("home_stat_exam_none") : `${nextExamDays}${t("home_stat_exam_days")}`}
           </p>
           <span className="meta-text">
-            {data.nextExam?.title ?? `現在有 ${data.currentlyStudyingCount} 人正在讀`}
+            {data.nextExam?.title ?? `${data.currentlyStudyingCount} ${t("home_studying_count")}`}
           </span>
         </article>
       </div>
 
+      {/* ── Goal card ── */}
+      <section className="dashboard-goal-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div className="stack-xs">
+            <h2 className="section-title">{t("home_goal_title")}</h2>
+            <p className="meta-text">{t("home_goal_desc")}</p>
+          </div>
+          <p className="dashboard-goal-card__minutes">{formatMinutes(data.todayMinutes)}</p>
+        </div>
+
+        {/* Badge strip */}
+        <div className="hero-meta" style={{ marginTop: 4 }}>
+          <span className="hero-badge">{t("home_today")} {formatMinutes(data.todayMinutes)}</span>
+          <span className="hero-badge">{t("home_streak")} {data.streakDays}{t("home_streak_days")}</span>
+          <span className="hero-badge">{data.dailyGoal.statusText}</span>
+          {currentUserRank ? (
+            <span className="hero-badge">{t("home_rank")}{currentUserRank}{t("home_rank_suffix")}</span>
+          ) : null}
+          {data.currentlyStudyingCount > 0 ? (
+            <span className="hero-badge">{data.currentlyStudyingCount} {t("home_studying_count")}</span>
+          ) : null}
+        </div>
+
+        {/* CTAs */}
+        <div className="button-row" style={{ marginTop: 8 }}>
+          <Link href="/focus" className={getButtonClassName("primary")}>{t("home_cta_focus")}</Link>
+          <Link href="/leaderboard" className={getButtonClassName("secondary")}>{t("home_cta_leaderboard")}</Link>
+        </div>
+      </section>
+
       <hr className="page-divider" />
 
+      {/* ── Leaderboard + Activity ── */}
       <div className="dashboard-hero">
-        <SectionCard
-          title="排行榜前段"
-          description="先看班上目前最穩的人，也順手確認你自己的位置。"
-          action={
-            <Link href="/leaderboard" className="text-link">
-              查看完整排行榜
-            </Link>
-          }
-        >
+
+        {/* Leaderboard preview */}
+        <section className="card">
+          <div className="section-header">
+            <div className="stack-xs">
+              <h2 className="section-title">{t("home_lb_title")}</h2>
+              <p className="section-description">{t("home_lb_desc")}</p>
+            </div>
+            <Link href="/leaderboard" className="text-link">{t("home_lb_link")}</Link>
+          </div>
+
           {data.leaderboardPreview.length === 0 ? (
-            <EmptyState
-              title="還沒有排行榜資料"
-              description="只要班上開始出現讀書紀錄，這裡就會更新。"
-            />
+            <EmptyState title={t("home_lb_empty_title")} description={t("home_lb_empty_desc")} />
           ) : (
-            <div className="leaderboard-list">
+            <div className="leaderboard-list" style={{ marginTop: 14 }}>
               {data.leaderboardPreview.map((entry) => (
                 <article
                   key={entry.userId}
-                  className={
-                    entry.isCurrentUser
-                      ? "top-rank-card top-rank-card--current"
-                      : "top-rank-card"
-                  }
+                  className={entry.isCurrentUser ? "top-rank-card top-rank-card--current" : "top-rank-card"}
                 >
                   <div className="top-rank-row">
                     <div className="leaderboard-row__meta">
-                      <span
-                        className={
-                          entry.rank <= 3
-                            ? "leaderboard-rank leaderboard-rank--top"
-                            : "leaderboard-rank"
-                        }
-                      >
-                        {entry.rank}
+                      <span className={entry.rank <= 3 ? "leaderboard-rank leaderboard-rank--top" : "leaderboard-rank"}>
+                        #{entry.rank}
                       </span>
                       <div className="stack-xs">
                         <strong>{entry.name}</strong>
                         <span className="meta-text">
-                          {formatMinutes(entry.minutes)} · 連續 {entry.streakDays} 天
+                          {formatMinutes(entry.minutes)} · {t("lb_streak")} {entry.streakDays}{t("lb_streak_days")}
                           {entry.badgeLabel ? ` · ${entry.badgeLabel}` : ""}
                         </span>
                       </div>
                     </div>
                     <span className="trend-pill">
-                      {entry.trend === "up"
-                        ? "上升"
-                        : entry.trend === "down"
-                          ? "下降"
-                          : "持平"}
+                      {entry.trend === "up" ? t("home_trend_up") : entry.trend === "down" ? t("home_trend_down") : t("home_trend_flat")}
                     </span>
                   </div>
                 </article>
               ))}
             </div>
           )}
-        </SectionCard>
+        </section>
 
-        <SectionCard
-          title="班級動態"
-          description="先看眾人的節奏在哪裡，再決定自己現在要不要立刻開讀。"
-          action={
-            <Link href="/groups" className="text-link">
-              前往小組
-            </Link>
-          }
-        >
+        {/* Class activity */}
+        <section className="card">
+          <div className="section-header">
+            <div className="stack-xs">
+              <h2 className="section-title">{t("home_activity_title")}</h2>
+              <p className="section-description">{t("home_activity_desc")}</p>
+            </div>
+            <Link href="/groups" className="text-link">{t("home_activity_link")}</Link>
+          </div>
+
           {data.activeGroups.length === 0 ? (
-            <EmptyState
-              title="還沒有活躍小組"
-              description="先建立或加入小組，首頁就會開始顯示同步讀書的人數。"
-            />
+            <EmptyState title={t("home_activity_empty_title")} description={t("home_activity_empty_desc")} />
           ) : (
-            <div className="stack-md">
+            <div className="stack-md" style={{ marginTop: 14 }}>
               {leadingHighlight ? (
-                <div className="state-card state-card--stack">
-                  <div className="stack-xs">
-                    <h3 className="state-title">{leadingHighlight.title}</h3>
-                    <p className="state-description">{leadingHighlight.description}</p>
-                  </div>
+                <div className="notice-banner notice-banner--info">
+                  <strong>{leadingHighlight.title}</strong> {leadingHighlight.description}
                 </div>
               ) : null}
 
@@ -257,17 +213,18 @@ export function HomePage() {
                     </div>
                     <div className="group-card__footer">
                       <span>{group.className}</span>
-                      <strong>{group.liveStudyingCount} 人在線</strong>
+                      <strong>{group.liveStudyingCount} {t("home_online")}</strong>
                     </div>
                   </Link>
                 ))}
               </div>
             </div>
           )}
-          <p className="meta-text">
-            最後同步時間：{formatDateTime(new Date().toISOString())}
+
+          <p className="meta-text" style={{ marginTop: 14 }}>
+            {t("home_sync_time")}{formatDateTime(new Date().toISOString())}
           </p>
-        </SectionCard>
+        </section>
       </div>
     </div>
   );

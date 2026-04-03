@@ -2,52 +2,39 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-
 import { Button } from "@/components/ui/button";
 import { NoticeBanner } from "@/components/ui/state-panels";
+import { LangSwitcher } from "@/components/ui/lang-switcher";
+import { useI18n } from "@/lib/i18n";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 
 type AuthMode = "login" | "register";
 
-function resolveLoginError(errorMessage: string) {
-  if (errorMessage.includes("Invalid login credentials")) {
-    return "帳號或密碼錯誤，請重新確認。";
-  }
-
-  if (errorMessage.includes("Email not confirmed")) {
-    return "信箱尚未驗證，請先完成驗證。";
-  }
-
-  return "登入失敗，請稍後再試。";
+function resolveLoginError(msg: string) {
+  if (msg.includes("Invalid login credentials")) return "Incorrect email or password.";
+  if (msg.includes("Email not confirmed")) return "Email not verified. Please check your inbox.";
+  return "Sign in failed. Please try again.";
 }
 
-function resolveRegisterError(errorMessage: string) {
-  if (errorMessage.includes("User already registered")) {
-    return "此 Email 已註冊，請直接登入。";
-  }
-
-  if (errorMessage.includes("Password should be at least")) {
-    return "密碼長度不足，請至少輸入 6 個字元。";
-  }
-
-  return "註冊失敗，請稍後再試。";
+function resolveRegisterError(msg: string) {
+  if (msg.includes("User already registered")) return "This email is already registered. Sign in instead.";
+  if (msg.includes("Password should be at least")) return "Password too short — minimum 6 characters.";
+  return "Registration failed. Please try again.";
 }
 
 export function LoginPage() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") ?? "/";
   const [mode, setMode] = useState<AuthMode>("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [notice, setNotice] = useState<{
-    text: string;
-    tone: "error" | "success";
-  } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; tone: "error" | "success" } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const modeTitle = useMemo(() => (mode === "login" ? "登入" : "註冊"), [mode]);
+  const modeTitle = useMemo(() => (mode === "login" ? t("auth_login") : t("auth_register")), [mode, t]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,40 +48,26 @@ export function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              display_name: displayName.trim() || undefined,
-            },
-          },
+          options: { data: { display_name: displayName.trim() || undefined } },
         });
-
-        if (error) {
-          throw error;
-        }
-
+        if (error) throw error;
         if (!data.session) {
-          setNotice({
-            text: "我們已寄出確認信，請先到信箱驗證後再登入。",
-            tone: "success",
-          });
+          setNotice({ text: t("auth_confirm_email"), tone: "success" });
           return;
         }
-
-        setNotice({ text: "註冊成功，正在前往首頁。", tone: "success" });
-        window.location.assign("/");
+        setNotice({ text: t("auth_register_success"), tone: "success" });
+        window.location.assign("/focus");
         return;
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      const redirectPath = nextPath.startsWith("/") ? nextPath : "/";
+      // Default landing page after login is /focus
+      const redirectPath = nextPath.startsWith("/") && nextPath !== "/" ? nextPath : "/focus";
       window.location.assign(redirectPath);
     } catch (reason) {
-      const fallback = getReadableErrorMessage(reason, mode === "login" ? "登入失敗，請稍後再試。" : "註冊失敗，請稍後再試。");
+      const fallback = getReadableErrorMessage(reason, "Error");
       setNotice({
         text: mode === "login" ? resolveLoginError(fallback) : resolveRegisterError(fallback),
         tone: "error",
@@ -106,18 +79,23 @@ export function LoginPage() {
 
   function handleToggleMode() {
     setNotice(null);
-    setMode((currentMode) => (currentMode === "login" ? "register" : "login"));
+    setMode((m) => (m === "login" ? "register" : "login"));
   }
 
   return (
     <div className="auth-shell">
       <div className="auth-panel">
-        <div className="auth-brand">
-          <p className="eyebrow">{modeTitle}</p>
-          <h1 className="auth-brand__title">StudyFocus</h1>
-          <p className="page-description">
-            {mode === "login" ? "使用 Email 與密碼登入，回到今天的專注節奏。" : "建立新帳號，開始你的每日專注學習。"}
-          </p>
+
+        {/* Top row: brand + lang */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div className="auth-brand">
+            <p className="eyebrow">{modeTitle}</p>
+            <h1 className="auth-brand__title">Study<span>Focus</span></h1>
+            <p className="page-description">
+              {mode === "login" ? t("auth_login_desc") : t("auth_register_desc")}
+            </p>
+          </div>
+          <LangSwitcher />
         </div>
 
         {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
@@ -126,57 +104,53 @@ export function LoginPage() {
           {mode === "register" ? (
             <div className="stack-xs">
               <label className="field-label" htmlFor="register-display-name">
-                顯示名稱（選填）
+                {t("auth_display_name")}
               </label>
               <input
                 id="register-display-name"
                 type="text"
                 className="input"
                 value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="例如：小明"
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={t("auth_display_name_hint")}
               />
             </div>
           ) : null}
 
           <div className="stack-xs">
-            <label className="field-label" htmlFor="login-email">
-              Email
-            </label>
+            <label className="field-label" htmlFor="login-email">{t("auth_email")}</label>
             <input
               id="login-email"
               type="email"
               className="input"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="demo@studyfocus.tw"
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t("auth_email_hint")}
               required
             />
           </div>
 
           <div className="stack-xs">
-            <label className="field-label" htmlFor="login-password">
-              密碼
-            </label>
+            <label className="field-label" htmlFor="login-password">{t("auth_password")}</label>
             <input
               id="login-password"
               type="password"
               className="input"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="請輸入密碼"
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("auth_password_hint")}
               minLength={6}
               required
             />
           </div>
 
           <Button type="submit" disabled={isSubmitting} fullWidth>
-            {isSubmitting ? `${modeTitle}中...` : modeTitle}
+            {isSubmitting ? t("auth_submitting") : modeTitle}
           </Button>
         </form>
 
         <button type="button" className="auth-register-link" disabled={isSubmitting} onClick={handleToggleMode}>
-          {mode === "login" ? "還沒有帳號？註冊" : "已有帳號？登入"}
+          {mode === "login" ? t("auth_to_register") : t("auth_to_login")}
         </button>
       </div>
     </div>

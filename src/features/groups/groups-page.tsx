@@ -4,8 +4,6 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { SectionCard } from "@/components/ui/section-card";
 import {
   AuthRequiredState,
   EmptyState,
@@ -14,41 +12,25 @@ import {
   NoticeBanner,
 } from "@/components/ui/state-panels";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { useI18n } from "@/lib/i18n";
 import { getReadableErrorMessage } from "@/lib/ui-error";
 import { getStudyFocusApi } from "@/services/study-focus-api";
 
 const studyFocusApi = getStudyFocusApi();
 
 export function GroupsPage() {
-  const {
-    data,
-    errorMessage,
-    errorStatus,
-    isError,
-    isLoading,
-    reload,
-    setData,
-  } = useAsyncData(() => studyFocusApi.getGroups(), []);
+  const { t } = useI18n();
+  const { data, errorMessage, errorStatus, isError, isLoading, reload, setData } =
+    useAsyncData(() => studyFocusApi.getGroups(), []);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    className: "",
-    description: "",
-    name: "",
-  });
+  const [createForm, setCreateForm] = useState({ className: "", description: "", name: "" });
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [notice, setNotice] = useState<{
-    text: string;
-    tone: "error" | "success";
-  } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; tone: "error" | "success" } | null>(null);
 
   function resetCreateForm() {
-    setCreateForm({
-      className: "",
-      description: "",
-      name: "",
-    });
+    setCreateForm({ className: "", description: "", name: "" });
   }
 
   function openCreateModal() {
@@ -60,32 +42,20 @@ export function GroupsPage() {
     event.preventDefault();
     setIsCreating(true);
     setNotice(null);
-
     try {
       const createdGroup = await studyFocusApi.createGroup({
         className: createForm.className.trim(),
         description: createForm.description.trim(),
         name: createForm.name.trim(),
       });
-
-      setData((current) => {
-        if (!current) {
-          return [createdGroup];
-        }
-
-        return [createdGroup, ...current.filter((group) => group.id !== createdGroup.id)];
-      });
-      setNotice({
-        text: `已建立「${createdGroup.name}」，現在可以直接開始同步讀書。`,
-        tone: "success",
-      });
+      setData((current) =>
+        current ? [createdGroup, ...current.filter((g) => g.id !== createdGroup.id)] : [createdGroup],
+      );
+      setNotice({ text: `「${createdGroup.name}」 created. Start studying together.`, tone: "success" });
       setIsCreateModalOpen(false);
       resetCreateForm();
     } catch (reason) {
-      setNotice({
-        text: getReadableErrorMessage(reason, "建立小組失敗。"),
-        tone: "error",
-      });
+      setNotice({ text: getReadableErrorMessage(reason, "Failed to create group."), tone: "error" });
     } finally {
       setIsCreating(false);
     }
@@ -93,43 +63,25 @@ export function GroupsPage() {
 
   async function handleJoinGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!joinCode.trim()) {
-      setNotice({
-        text: "請先輸入邀請碼。",
-        tone: "error",
-      });
+      setNotice({ text: t("groups_join_code_label"), tone: "error" });
       return;
     }
-
     setIsJoining(true);
     setNotice(null);
-
     try {
-      const joinedGroup = await studyFocusApi.joinGroup({
-        joinCode: joinCode.trim(),
-      });
-
+      const joinedGroup = await studyFocusApi.joinGroup({ joinCode: joinCode.trim() });
       setData((current) => {
-        if (!current) {
-          return [joinedGroup];
-        }
-
-        const exists = current.some((group) => group.id === joinedGroup.id);
+        if (!current) return [joinedGroup];
+        const exists = current.some((g) => g.id === joinedGroup.id);
         return exists
-          ? current.map((group) => (group.id === joinedGroup.id ? joinedGroup : group))
+          ? current.map((g) => (g.id === joinedGroup.id ? joinedGroup : g))
           : [joinedGroup, ...current];
       });
       setJoinCode("");
-      setNotice({
-        text: `已加入「${joinedGroup.name}」。`,
-        tone: "success",
-      });
+      setNotice({ text: `Joined「${joinedGroup.name}」.`, tone: "success" });
     } catch (reason) {
-      setNotice({
-        text: getReadableErrorMessage(reason, "加入小組失敗。"),
-        tone: "error",
-      });
+      setNotice({ text: getReadableErrorMessage(reason, "Failed to join group."), tone: "error" });
     } finally {
       setIsJoining(false);
     }
@@ -138,7 +90,7 @@ export function GroupsPage() {
   if (isLoading) {
     return (
       <div className="page">
-        <LoadingState label="正在整理你的小組清單。" />
+        <LoadingState label={t("groups_loading")} />
       </div>
     );
   }
@@ -147,9 +99,9 @@ export function GroupsPage() {
     return (
       <div className="page">
         {errorStatus === 401 ? (
-          <AuthRequiredState description="登入後才能查看已加入的小組與邀請碼。" />
+          <AuthRequiredState description={t("groups_auth_desc")} />
         ) : (
-          <ErrorState description={errorMessage ?? "小組資料載入失敗。"} onRetry={reload} />
+          <ErrorState description={errorMessage ?? t("groups_loading")} onRetry={reload} />
         )}
       </div>
     );
@@ -159,138 +111,153 @@ export function GroupsPage() {
 
   return (
     <div className="page stack-lg">
-      <PageHeader
-        eyebrow="讀書小組"
-        title="先進到同一組，專注、討論和排行榜才會接起來。"
-        description="這裡會整理你已加入的小組，也可以用邀請碼快速加入，或直接建立新的讀書組。"
-        actions={<Button onClick={openCreateModal}>建立小組</Button>}
-      />
+
+      {/* Header */}
+      <header style={{ paddingTop: 52, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div className="stack-xs">
+          <p className="eyebrow">{t("groups_eyebrow")}</p>
+          <h1 className="page-title">{t("groups_title")}</h1>
+          <p className="page-description">{t("groups_desc")}</p>
+        </div>
+        <div style={{ paddingTop: 32 }}>
+          <Button onClick={openCreateModal}>{t("groups_create_btn")}</Button>
+        </div>
+      </header>
 
       {notice ? <NoticeBanner tone={notice.tone}>{notice.text}</NoticeBanner> : null}
 
-      <div className="split-grid split-grid--sidebar">
-        <SectionCard
-          title="已加入的小組"
-          description="優先看現在有人在讀的組，最容易直接接上節奏。"
+      {/* Join form — compact, on top */}
+      <section className="card card--muted">
+        <div className="section-header" style={{ marginBottom: 14 }}>
+          <div className="stack-xs">
+            <h2 className="section-title">{t("groups_join_title")}</h2>
+            <p className="section-description">{t("groups_join_desc")}</p>
+          </div>
+        </div>
+        <form
+          className="stack-sm"
+          onSubmit={handleJoinGroup}
+          style={{ flexDirection: "row", alignItems: "flex-end", flexWrap: "wrap", gap: 10 }}
         >
-          {groups.length === 0 ? (
-            <EmptyState
-              title="還沒有加入任何小組"
-              description="先建立自己的讀書小組，或輸入同學給你的邀請碼。"
-              action={<Button onClick={openCreateModal}>建立第一個小組</Button>}
+          <div className="stack-xs" style={{ flex: "1 1 200px" }}>
+            <label className="field-label" htmlFor="join-code">
+              {t("groups_join_code_label")}
+            </label>
+            <input
+              id="join-code"
+              className="input"
+              value={joinCode}
+              onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+              placeholder={t("groups_join_code_hint")}
+              autoCapitalize="characters"
             />
-          ) : (
-            <div className="group-list">
-              {groups.map((group) => (
-                <Link key={group.id} href={`/groups/${group.id}`} className="group-card">
-                  <div className="stack-sm">
-                    <div className="stack-xs">
-                      <strong>{group.name}</strong>
-                      <p className="section-description">{group.description}</p>
-                    </div>
-                    <div className="chip-row">
-                      <span className="subject-pill">{group.className}</span>
-                      <span className="subject-pill">{group.memberCount} 人</span>
-                      <span className="subject-pill">{group.liveStudyingCount} 人在讀</span>
-                    </div>
+          </div>
+          <Button type="submit" disabled={isJoining}>
+            {isJoining ? t("groups_joining") : t("groups_join_btn")}
+          </Button>
+        </form>
+      </section>
+
+      {/* Joined groups */}
+      <section className="card">
+        <div className="section-header" style={{ marginBottom: 14 }}>
+          <div className="stack-xs">
+            <h2 className="section-title">{t("groups_joined_title")}</h2>
+            <p className="section-description">{t("groups_joined_desc")}</p>
+          </div>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.78rem",
+            color: "var(--text-faint)",
+            fontWeight: 700,
+          }}>
+            {groups.length} {t("groups_people")}
+          </span>
+        </div>
+
+        {groups.length === 0 ? (
+          <EmptyState
+            title={t("groups_empty_title")}
+            description={t("groups_empty_desc")}
+            action={<Button onClick={openCreateModal}>{t("groups_empty_btn")}</Button>}
+          />
+        ) : (
+          <div className="group-list">
+            {groups.map((group) => (
+              <Link key={group.id} href={`/groups/${group.id}`} className="group-card">
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                  <div className="stack-xs">
+                    <strong>{group.name}</strong>
+                    <p className="section-description">{group.description}</p>
                   </div>
-                  <div className="group-card__footer">
-                    <span>邀請碼 {group.joinCode}</span>
-                    <strong>查看小組</strong>
+                  <span style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.78rem",
+                    color: group.liveStudyingCount > 0 ? "var(--cyan-300)" : "var(--text-faint)",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}>
+                    {group.liveStudyingCount} {t("groups_studying")}
+                  </span>
+                </div>
+                <div className="group-card__footer">
+                  <div className="chip-row">
+                    <span className="subject-pill">{group.className}</span>
+                    <span className="subject-pill">{group.memberCount} {t("groups_people")}</span>
                   </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem", color: "var(--text-faint)" }}>
+                    {t("groups_invite_code")} {group.joinCode}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
-        <SectionCard
-          title="加入現有小組"
-          description="拿到邀請碼後直接加入，排行榜和討論板就會同步出現。"
-          muted
-        >
-          <form className="field-grid" onSubmit={handleJoinGroup}>
-            <div className="stack-xs">
-              <label className="field-label" htmlFor="join-code">
-                邀請碼
-              </label>
-              <input
-                id="join-code"
-                className="input"
-                value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-                placeholder="例如：DAAN3A"
-                autoCapitalize="characters"
-              />
-            </div>
-
-            <Button type="submit" disabled={isJoining} fullWidth>
-              {isJoining ? "加入中..." : "立即加入"}
-            </Button>
-          </form>
-        </SectionCard>
-      </div>
-
+      {/* Create modal */}
       <Modal
         open={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="建立新小組"
-        description="適合班內讀書組、段考衝刺組，或幾個同學一起維持節奏。"
+        title={t("groups_create_title")}
+        description={t("groups_create_desc")}
       >
         <form className="field-grid" onSubmit={handleCreateGroup}>
           <div className="stack-xs">
-            <label className="field-label" htmlFor="group-name">
-              小組名稱
-            </label>
+            <label className="field-label" htmlFor="group-name">{t("groups_name_label")}</label>
             <input
               id="group-name"
               className="input"
               value={createForm.name}
-              onChange={(event) =>
-                setCreateForm((current) => ({ ...current, name: event.target.value }))
-              }
-              placeholder="例如：段考衝刺班"
+              onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))}
+              placeholder={t("groups_name_hint")}
               required
             />
           </div>
-
           <div className="stack-xs">
-            <label className="field-label" htmlFor="group-class-name">
-              班級 / 標籤
-            </label>
+            <label className="field-label" htmlFor="group-class-name">{t("groups_class_label")}</label>
             <input
               id="group-class-name"
               className="input"
               value={createForm.className}
-              onChange={(event) =>
-                setCreateForm((current) => ({ ...current, className: event.target.value }))
-              }
-              placeholder="例如：高三自然組"
+              onChange={(e) => setCreateForm((c) => ({ ...c, className: e.target.value }))}
+              placeholder={t("groups_class_hint")}
               required
             />
           </div>
-
           <div className="stack-xs">
-            <label className="field-label" htmlFor="group-description">
-              小組說明
-            </label>
+            <label className="field-label" htmlFor="group-description">{t("groups_desc_label")}</label>
             <textarea
               id="group-description"
               className="textarea"
               value={createForm.description}
-              onChange={(event) =>
-                setCreateForm((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-              placeholder="例如：平日晚上 8 點一起讀一輪，讀完互相回報。"
+              onChange={(e) => setCreateForm((c) => ({ ...c, description: e.target.value }))}
+              placeholder={t("groups_desc_hint")}
               required
             />
           </div>
-
           <Button type="submit" disabled={isCreating} fullWidth>
-            {isCreating ? "建立中..." : "送出建立"}
+            {isCreating ? t("groups_creating") : t("groups_submit")}
           </Button>
         </form>
       </Modal>

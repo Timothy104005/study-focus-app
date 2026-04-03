@@ -4,14 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import { cn } from "@/lib/cn";
-
-const drawerItems: Array<{ href: Route; label: string }> = [
-  { href: "/focus", label: "Focus" },
-  { href: "/groups", label: "Groups" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/profile", label: "Profile" },
-  { href: "/exams", label: "Exams" },
-];
+import { useI18n } from "@/lib/i18n";
+import { LangSwitcher } from "@/components/ui/lang-switcher";
 
 interface AppDrawerProps {
   isOpen: boolean;
@@ -20,14 +14,36 @@ interface AppDrawerProps {
 
 export function AppDrawer({ isOpen, onClose }: AppDrawerProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
+
+  const drawerItems: Array<{ href: Route; label: string }> = [
+    { href: "/focus", label: t("nav_focus") },
+    { href: "/groups", label: t("nav_groups") },
+    { href: "/leaderboard", label: t("nav_record") },
+    { href: "/profile", label: t("nav_profile") },
+    { href: "/exams", label: t("nav_plan") },
+  ];
 
   return (
     <>
       <aside className={cn("app-drawer", isOpen && "app-drawer--open")}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--brick-400)",
+          }}>
+            StudyFocus
+          </span>
+          <LangSwitcher />
+        </div>
+
         <nav className="app-drawer__nav" aria-label="主要導覽">
           {drawerItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
-
             return (
               <Link
                 key={item.href}
