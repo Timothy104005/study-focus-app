@@ -72,12 +72,12 @@ async function loadFocusPageData(): Promise<FocusPageData> {
   };
 }
 
-const focusDrawerItems = [
-  { href: "/focus", labelKey: "nav_focus" as const },
-  { href: "/groups", labelKey: "nav_groups" as const },
-  { href: "/exams", labelKey: "nav_plan" as const },
-  { href: "/leaderboard", labelKey: "nav_record" as const },
-  { href: "/profile", labelKey: "nav_profile" as const },
+const focusDrawerItems: { href: "/focus" | "/groups" | "/exams" | "/leaderboard" | "/profile"; labelKey: "nav_focus" | "nav_groups" | "nav_plan" | "nav_record" | "nav_profile" }[] = [
+  { href: "/focus", labelKey: "nav_focus" },
+  { href: "/groups", labelKey: "nav_groups" },
+  { href: "/exams", labelKey: "nav_plan" },
+  { href: "/leaderboard", labelKey: "nav_record" },
+  { href: "/profile", labelKey: "nav_profile" },
 ];
 
 function FocusCanvasShell({
